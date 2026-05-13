@@ -2,7 +2,8 @@
 {% block content %}
 <h1>الألعاب المعروضة في الواجهة</h1>
 <p class="muted">
-  ابحث عن اللعبة ثم فعّلها لتظهر في واجهة الموقع. إذا كانت لعبة لديها أقسام مفعّلة للواجهة الرئيسية، ستظهر الأقسام بدل اللعبة الأصلية.
+  اختر الألعاب المفعّلة، ثم حدّد الألعاب التي ستظهر في <b>الصفحة الرئيسية</b> فقط.
+  باقي الألعاب ستبقى متاحة للمستخدم من خلال زر <b>"عرض جميع الألعاب"</b>.
 </p>
 
 {# V49.1: wrap the whole list + submit button inside a SINGLE form. Previously
@@ -29,13 +30,20 @@
     {% for g in games %}
       <div class="admin-game-row {% if g.active %}is-active{% else %}is-hidden-initial{% endif %}"
            data-game-name="{{ (g.name ~ ' ' ~ g.game_key ~ ' ' ~ g.provider)|lower }}">
-        <label>
-          <input type="checkbox" name="active_game" value="{{ g.provider }}::{{ g.game_key }}" {% if g.active %}checked{% endif %}>
+        <label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input type="checkbox" class="js-active-cb" name="active_game" value="{{ g.provider }}::{{ g.game_key }}" {% if g.active %}checked{% endif %}>
           <b>{{ g.emoji or '🎮' }} {{ g.name }}</b>
           <span class="muted">({{ g.provider }} / {{ g.game_key }}) • {{ g.product_count or 0 }} باقة</span>
         </label>
 
-        <div class="row-actions" style="align-items:center">
+        <div class="row-actions" style="align-items:center;gap:10px;flex-wrap:wrap">
+          <label class="muted" style="display:inline-flex;gap:6px;align-items:center;font-size:.85rem">
+            <input type="checkbox" class="js-home-cb" name="home_game"
+                   value="{{ g.provider }}::{{ g.game_key }}"
+                   {% if g.show_on_home %}checked{% endif %}
+                   {% if not g.active %}disabled{% endif %}>
+            إظهار في الرئيسية
+          </label>
           {% if g.image_url %}
             <img src="{{ g.image_url }}" alt="{{ g.name }}" style="width:46px;height:46px;object-fit:cover;border-radius:12px;border:1px solid rgba(255,255,255,.12)">
           {% endif %}

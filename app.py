@@ -19,7 +19,7 @@ from flask_wtf.csrf import CSRFProtect, CSRFError
 
 from database import (
     InsufficientBalance,
-    init_db, ensure_indexes, seed_admin, create_user, authenticate, get_user, get_user_by_email, verify_user_email, set_user_email_token, set_password_reset_token, get_user_by_reset_token, reset_user_password, list_games, list_products, list_public_games, list_all_game_groups, list_product_games_from_products, add_custom_game, set_game_active, accounting_summary, list_product_groups, get_product_group, create_product_group, update_product_group, delete_product_group, update_products_admin, update_game_pricing, update_manual_syp_prices, translate_product_name, list_public_product_groups_for_home,
+    init_db, ensure_indexes, seed_admin, create_user, authenticate, get_user, get_user_by_email, verify_user_email, set_user_email_token, set_password_reset_token, get_user_by_reset_token, reset_user_password, list_games, list_products, list_public_games, list_all_game_groups, list_product_games_from_products, add_custom_game, set_game_active, set_game_show_on_home, list_home_games, accounting_summary, list_product_groups, get_product_group, create_product_group, update_product_group, delete_product_group, update_products_admin, update_game_pricing, update_manual_syp_prices, translate_product_name, list_public_product_groups_for_home,
     get_product, get_game, create_order, update_order, list_user_orders, list_orders,
     get_order, stats, list_users, search_users, get_user_by_id, user_financial_summary, list_user_deposits_admin, update_user_profile, set_pending_email_change, confirm_pending_email_change, set_user_balance, change_balance,
     list_payment_methods, get_payment_method, update_payment_method,
@@ -1357,11 +1357,19 @@ def home():
     if user:
         recent_orders = list_user_orders(user["id"])[:3]
     all_stats = stats()
-    # V54: Use actual DB games for the homepage grid instead of static FEATURED_GAMES.
-    # Only show games that have at least 1 active product (product_count > 0).
-    featured = [g for g in games if g.get("product_count", 0) > 0]
+    # V55: Homepage shows ONLY games flagged by admin (show_on_home=1). If the
+    # admin hasn't picked any, fall back to the first 8 active games with
+    # packages so the page is never blank.
+    home_selected = list_home_games()
+    if home_selected:
+        # احترم إعدادات الأدمن حتى لو اللعبة لا تملك باقات بعد.
+        featured = [g for g in home_selected if g.get("product_count", 0) > 0] or home_selected
+    else:
+        featured = [g for g in games if g.get("product_count", 0) > 0][:8]
+    has_more_games = len([g for g in games if g.get("product_count", 0) > 0]) > len(featured)
     return render_template("home.html", games=games, home_groups=groups,
         featured_games=featured,
+        has_more_games=has_more_games,
         recent_orders=recent_orders,
         games_count=len(games) + len(groups),
         completed_orders_count=all_stats.get("completed", 0) if all_stats else 0)
@@ -1402,6 +1410,18 @@ def games(provider):
         abort(404)
     games = list_games(provider)
     return render_template("games.html", provider=provider, games=games)
+
+
+# V55: Landing page for "عرض جميع الألعاب" — shows every active game in one grid.
+@app.route("/all-games")
+@app.route("/legacy/all-games")
+def all_games():
+    games = [g for g in list_public_games(True) if g.get("product_count", 0) > 0]
+    groups = list_public_product_groups_for_home() if get_setting("show_groups_direct", "0") == "1" else []
+    if groups:
+        grouped_keys = {(g.get("provider"), g.get("game_key")) for g in groups}
+        games = [g for g in games if (g.get("provider"), g.get("game_key")) not in grouped_keys]
+    return render_template("all_games.html", games=games, home_groups=groups)
 
 
 @app.route("/products/<provider>/<game_key>")
@@ -2306,11 +2326,17 @@ def setup_once():
 @admin_required
 def admin_games():
     if request.method == "POST":
-        # حفظ الألعاب التي تظهر في واجهة المستخدم
+        # V55: حفظ حقلين — الألعاب المفعّلة والألعاب التي تظهر في الرئيسية.
         active_keys = set(request.form.getlist("active_game"))
+        home_keys = set(request.form.getlist("home_game"))
         for game in list_all_game_groups():
             key = f"{game['provider']}::{game['game_key']}"
-            set_game_active(game["provider"], game["game_key"], key in active_keys)
+            is_active = key in active_keys
+            set_game_active(game["provider"], game["game_key"], is_active)
+            # إظهار في الرئيسية مقيَّد بالألعاب المفعّلة فقط.
+            set_game_show_on_home(
+                game["provider"], game["game_key"], is_active and (key in home_keys)
+            )
         flash("تم حفظ الألعاب المعروضة في الواجهة", "success")
         return redirect(url_for("admin_games"))
 

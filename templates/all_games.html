@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head" style="padding:28px 0 8px">
+  <div>
+    <div class="tg-pill small">{{ "All catalog" if is_en else "كامل المتجر" }}</div>
+    <h1>{{ "All games" if is_en else "جميع الألعاب" }}</h1>
+    <p class="muted">{{ "Browse every available title and pick what you need." if is_en else "تصفّح جميع الألعاب المتاحة واختر ما يناسبك." }}</p>
+  </div>
+</section>
+
+{% if games or home_groups %}
+  <div class="tg-search-wrap">
+    <input id="gameSearch" class="tg-search-input" type="search" placeholder="{{ t('search_game') }}">
+  </div>
+
+  <div class="tg-game-grid" id="games-grid">
+    {% for g in home_groups %}
+      {% set img = g.game_image_url if g.game_image_url else url_for('static', filename='img/game-default.svg') %}
+      <a class="tg-game-card searchable-game"
+         data-name="{{ (g.game_name ~ ' ' ~ g.name)|lower }}"
+         href="{{ url_for('products_group', provider=g.provider, game_key=g.game_key, group_id=g.id) }}"
+         style="animation-delay: {{ (loop.index0 * 40) }}ms">
+        <div class="tg-game-cover">
+          <img src="{{ img }}" alt="{{ g.game_name }} - {{ g.name }}" loading="{% if loop.index <= 8 %}eager{% else %}lazy{% endif %}">
+          <div class="tg-game-gradient"></div>
+        </div>
+        <div class="tg-game-body">
+          <h3>{{ g.game_emoji or '🎮' }} {{ g.game_name }} — {{ g.name }}</h3>
+          <p class="tg-game-sub">{{ g.product_count or 0 }} {{ t("packages") }}</p>
+        </div>
+      </a>
+    {% endfor %}
+
+    {% for g in games %}
+      {% set img = game_image(g) if game_image is defined else (g.image_url if g.image_url else url_for('static', filename='img/game-default.svg')) %}
+      <a class="tg-game-card searchable-game"
+         data-name="{{ g.name|lower }}"
+         href="{{ url_for('products', provider=g.provider, game_key=g.game_key) }}"
+         style="animation-delay: {{ (loop.index0 * 40) }}ms">
+        <div class="tg-game-cover">
+          <img src="{{ img }}" alt="{{ g.name }}" loading="{% if loop.index <= 8 %}eager{% else %}lazy{% endif %}">
+          <div class="tg-game-gradient"></div>
+        </div>
+        <div class="tg-game-body">
+          <h3>{{ g.emoji or '🎮' }} {{ g.name }}</h3>
+          <p class="tg-game-sub">{{ g.product_count or 0 }} {{ t("packages") }}</p>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+
+  <div id="no-games-msg" class="empty-state" style="display:none">
+    {{ "No games found." if is_en else "لا توجد نتائج." }}
+  </div>
+
+  <script nonce="{{ csp_nonce }}">
+  (function(){
+    var input = document.getElementById('gameSearch');
+    if (!input) return;
+    var cards = Array.from(document.querySelectorAll('.searchable-game'));
+    var names = cards.map(function(c){ return (c.getAttribute('data-name') || '').toLowerCase(); });
+    var empty = document.getElementById('no-games-msg');
+    input.addEventListener('input', function(){
+      var q = this.value.trim().toLowerCase();
+      var visible = 0;
+      cards.forEach(function(c, i){
+        var show = !q || names[i].indexOf(q) !== -1;
+        c.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+      if (empty) empty.style.display = visible ? 'none' : 'block';
+    });
+  })();
+  </script>
+{% else %}
+  <div class="card">
+    <h2>{{ "No games available" if is_en else "لا توجد ألعاب متاحة" }}</h2>
+    <p class="muted">{{ "Please check back later." if is_en else "يرجى العودة لاحقًا." }}</p>
+  </div>
+{% endif %}
+{% endblock %}

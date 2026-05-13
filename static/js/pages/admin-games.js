@@ -53,6 +53,12 @@
     if (input) {
       input.addEventListener('change', () => {
         row.classList.toggle('is-active', input.checked);
+        // V55: keep "show on home" in sync — a disabled game can't be on home.
+        const homeCb = row.querySelector('input.js-home-cb');
+        if (homeCb) {
+          homeCb.disabled = !input.checked;
+          if (!input.checked) homeCb.checked = false;
+        }
         render();
       });
     }
