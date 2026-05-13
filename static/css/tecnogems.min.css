@@ -2551,3 +2551,21 @@ html {
   scrollbar-gutter: stable;
   overflow-y: scroll;
 }
+
+
+/* ============ V55: Popular games — horizontal carousel overrides ============ */
+.tg-popular-scroller{position:relative;margin-top:1.5rem}
+.tg-popular-scroller .tg-popular-grid{display:flex;flex-wrap:nowrap;gap:14px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-padding-inline:16px;padding:4px 4px 18px;margin-top:0;grid-template-columns:none;scrollbar-width:thin;scrollbar-color:rgba(110,231,255,.35) transparent;-webkit-overflow-scrolling:touch}
+.tg-popular-scroller .tg-popular-grid::-webkit-scrollbar{height:6px}
+.tg-popular-scroller .tg-popular-grid::-webkit-scrollbar-thumb{background:rgba(110,231,255,.35);border-radius:999px}
+.tg-popular-scroller .tg-popular-card{flex:0 0 auto;width:clamp(150px,42vw,220px);scroll-snap-align:start}
+@media (min-width:720px){.tg-popular-scroller .tg-popular-card{width:200px}}
+@media (min-width:1100px){.tg-popular-scroller .tg-popular-card{width:220px}}
+.tg-scroll-btn{position:absolute;top:50%;transform:translateY(-60%);z-index:4;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(10,10,25,.82);color:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 6px 20px -6px rgba(0,0,0,.6);transition:opacity .2s ease,transform .2s ease}
+.tg-scroll-btn:hover{transform:translateY(-60%) scale(1.06)}
+.tg-scroll-prev{inset-inline-start:-6px}
+.tg-scroll-next{inset-inline-end:-6px}
+.tg-popular-scroller.at-start .tg-scroll-prev,.tg-popular-scroller.at-end .tg-scroll-next,.tg-popular-scroller.no-overflow .tg-scroll-btn{opacity:0;pointer-events:none}
+@media (max-width:720px){.tg-scroll-btn{display:none}}
+.tg-popular-cta{display:flex;justify-content:center;margin-top:18px}
+.tg-popular-cta .tg-btn{display:inline-flex;align-items:center;gap:2px;padding:12px 22px;border-radius:14px;font-weight:700;font-size:.95rem}

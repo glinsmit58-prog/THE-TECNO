@@ -302,6 +302,19 @@ def _init_db_inner(conn):
     except Exception:
         pass
 
+    # V55: admin-controlled homepage visibility. When no rows have show_on_home=1,
+    # the homepage falls back to showing the first N active games (see app.home()).
+    try:
+        cur.execute("ALTER TABLE games ADD COLUMN show_on_home INTEGER NOT NULL DEFAULT 0")
+    except Exception:
+        pass
+
+    # V55: optional manual ordering of homepage games. 0 = use default order.
+    try:
+        cur.execute("ALTER TABLE games ADD COLUMN home_sort_order INTEGER NOT NULL DEFAULT 0")
+    except Exception:
+        pass
+
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS products (
@@ -747,6 +760,33 @@ def set_game_active(provider, game_key, active):
     with db_conn() as conn:
         conn.execute("UPDATE games SET active=? WHERE provider=? AND game_key=?", (1 if active else 0, provider, game_key))
         conn.commit()
+
+
+# V55: admin-controlled homepage visibility.
+def set_game_show_on_home(provider, game_key, show):
+    with db_conn() as conn:
+        conn.execute(
+            "UPDATE games SET show_on_home=? WHERE provider=? AND game_key=?",
+            (1 if show else 0, provider, game_key),
+        )
+        conn.commit()
+
+
+def list_home_games():
+    """Return only games flagged by admin as visible on homepage, with product_count & min_price.
+    Falls back to an empty list; caller decides the fallback policy."""
+    with db_conn() as conn:
+        return [dict(r) for r in conn.execute("""
+            SELECT g.*,
+                   COUNT(p.id) AS product_count,
+                   MIN(p.sell_price) AS min_price
+            FROM games g
+            LEFT JOIN products p ON p.provider=g.provider AND p.game_key=g.game_key AND p.active=1
+            WHERE g.active=1 AND g.show_on_home=1
+            GROUP BY g.id
+            ORDER BY CASE WHEN COALESCE(g.home_sort_order,0)=0 THEN 999999 ELSE g.home_sort_order END ASC,
+                     g.name ASC
+        """).fetchall()]
 
 
 def upsert_product(provider, game_key, provider_product_id, name, base_price, sell_price, active=1):
