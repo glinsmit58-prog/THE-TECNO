@@ -1,0 +1,58 @@
+{# V54: Dynamic "Popular games" grid — data from DB (list_public_games). #}
+{# Replaces the old static FEATURED_GAMES approach. Games must have product_count > 0. #}
+<section class="tg-popular-section" id="games">
+  <div class="tg-popular-head">
+    <div class="tg-popular-pill">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>
+      {{ "Trending now" if is_en else "الأكثر رواجًا" }}
+    </div>
+    <h2 class="tg-popular-title">
+      {{ "Popular" if is_en else "الألعاب" }} <span class="accent">{{ "games" if is_en else "الأكثر طلبًا" }}</span>
+    </h2>
+    <p class="tg-popular-sub">{{ "Top up your favorite titles in just a few clicks." if is_en else "اشحن ألعابك المفضلة بنقرات قليلة." }}</p>
+  </div>
+
+  {# Search box #}
+  <div class="tg-search-wrap" style="margin-bottom:18px">
+    <input id="gameSearch" class="tg-search-input" type="search" placeholder="{{ t('search_game') }}">
+  </div>
+
+  <div class="tg-popular-grid">
+    {% for g in featured_games %}
+      <a class="tg-popular-card"
+         href="{{ url_for('products', provider=g.provider, game_key=g.game_key) }}"
+         aria-label="{{ g.name }}"
+         data-name="{{ g.name|lower }}">
+        <img class="tg-popular-card-img"
+             src="{{ game_image(g) }}"
+             alt="{{ g.name }}"
+             loading="{% if loop.index <= 6 %}eager{% else %}lazy{% endif %}"
+             decoding="async"
+             width="120" height="120">
+        <div class="tg-popular-card-body">
+          <h3 class="tg-popular-card-title">{{ g.name }}</h3>
+          <p class="tg-popular-card-sub">{{ g.product_count or 0 }} {{ t("packages") }}</p>
+          {% if g.min_price and g.min_price > 0 %}
+            <span class="tg-popular-card-price">{{ product_price({'sell_price': g.min_price}) }}</span>
+          {% endif %}
+        </div>
+      </a>
+    {% else %}
+      <p class="empty-state">{{ "No games available yet." if is_en else "لا توجد ألعاب متاحة حاليًا." }}</p>
+    {% endfor %}
+  </div>
+</section>
+
+<script nonce="{{ csp_nonce }}">
+(function(){
+  var input = document.getElementById('gameSearch');
+  if(!input) return;
+  input.addEventListener('input', function(){
+    var q = this.value.toLowerCase().trim();
+    document.querySelectorAll('.tg-popular-card').forEach(function(card){
+      var name = card.getAttribute('data-name') || '';
+      card.style.display = (!q || name.indexOf(q) !== -1) ? '' : 'none';
+    });
+  });
+})();
+</script>
