@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
+
+{# ═══════ HERO SECTION — Cinematic ═══════ #}
 <section class="tg-hero">
   <div class="tg-hero-bg">
     <div class="tg-hero-bg-gradient"></div>
@@ -8,26 +10,34 @@
     <div class="tg-pill">{{ t("hero_pill") }}</div>
     <h1>{{ t("hero_title_1") }}<br><span>{{ t("hero_title_2") }}</span></h1>
     <p>{{ t("hero_desc") }}</p>
-    {% if current_user %}
+
     <div class="tg-hero-stats">
       <div class="tg-hero-stat">
-        <span class="tg-hero-stat-num">{{ games_count or '30+' }}</span>
+        <span class="tg-hero-stat-num" data-count="{{ games_count or '30' }}">{{ games_count or '30+' }}</span>
         <span class="tg-hero-stat-label">{{ "Games" if is_en else "لعبة" }}</span>
       </div>
       <div class="tg-hero-stat-divider"></div>
       <div class="tg-hero-stat">
-        <span class="tg-hero-stat-num">{{ completed_orders_count or '1000+' }}</span>
+        <span class="tg-hero-stat-num" data-count="{{ completed_orders_count or '1000' }}">{{ completed_orders_count or '1000+' }}</span>
         <span class="tg-hero-stat-label">{{ "Orders" if is_en else "طلب منجز" }}</span>
       </div>
       <div class="tg-hero-stat-divider"></div>
       <div class="tg-hero-stat">
         <span class="tg-hero-stat-num">⚡</span>
-        <span class="tg-hero-stat-label">{{ "Instant" if is_en else "فوري" }}</span>
+        <span class="tg-hero-stat-label">{{ "Instant" if is_en else "تسليم فوري" }}</span>
+      </div>
+      <div class="tg-hero-stat-divider"></div>
+      <div class="tg-hero-stat">
+        <span class="tg-hero-stat-num">99.9%</span>
+        <span class="tg-hero-stat-label">{{ "Uptime" if is_en else "وقت التشغيل" }}</span>
       </div>
     </div>
-    {% endif %}
+
     <div class="tg-hero-actions">
-      <a href="#games" class="tg-btn tg-primary">{{ t("browse_games") }}</a>
+      <a href="#games" class="tg-btn tg-primary">
+        {{ t("browse_games") }}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+      </a>
       {% if current_user %}
         <a href="{{ url_for('wallet') }}" class="tg-btn tg-glass">{{ t("topup_wallet") }}</a>
       {% else %}
@@ -37,13 +47,189 @@
   </div>
 </section>
 
-{# V45: replaced dynamic DB-driven grid with static "Popular games" featured grid. #}
-{# Original loop preserved in git history. To re-enable DB grid, see _games_grid_legacy.html. #}
+{# ═══════ POPULAR GAMES ═══════ #}
 {% include "_popular_games.html" %}
 
-<button class="back-to-top" id="back-to-top" aria-label="العودة للأعلى" title="العودة للأعلى">
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
-</button>
+{# ═══════ BEST SELLERS ═══════ #}
+<section class="nb-section nb-reveal" id="best-sellers">
+  <div class="container">
+    <div class="nb-section-head">
+      <div class="nb-section-pill gold">🔥 {{ "Hot Deals" if is_en else "العروض الحارة" }}</div>
+      <h2 class="nb-section-title">{{ "Best" if is_en else "الأكثر" }} <span class="gradient">{{ "Sellers" if is_en else "مبيعاً" }}</span></h2>
+      <p class="nb-section-sub">{{ "Most popular packages chosen by our customers" if is_en else "أكثر الباقات شعبية بين عملائنا" }}</p>
+    </div>
+    <div class="nb-bestsellers-track">
+      {% for g in featured_games[:8] %}
+      <div class="nb-bestseller-card">
+        {% if loop.index <= 3 %}<span class="nb-badge-best">⭐ Best</span>{% endif %}
+        {% if loop.index == 1 %}<span class="nb-badge-hot">🔥 Hot</span>{% endif %}
+        <img src="{{ game_image(g) }}" alt="{{ g.name }}" loading="lazy" decoding="async">
+        <div class="nb-bestseller-info">
+          <h3 class="nb-bestseller-name">{{ g.name }}</h3>
+          {% if g.min_price and g.min_price > 0 %}
+            <span class="nb-bestseller-price">{{ product_price({'sell_price': g.min_price}) }}</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{# ═══════ HOW IT WORKS ═══════ #}
+<section class="nb-section nb-reveal" id="how-it-works">
+  <div class="container">
+    <div class="nb-section-head">
+      <div class="nb-section-pill cyan">⚡ {{ "Quick & Easy" if is_en else "سريع وسهل" }}</div>
+      <h2 class="nb-section-title">{{ "How it" if is_en else "كيف" }} <span class="gradient">{{ "works" if is_en else "يعمل؟" }}</span></h2>
+      <p class="nb-section-sub">{{ "Get your top-up in 3 simple steps" if is_en else "احصل على شحنك في 3 خطوات بسيطة" }}</p>
+    </div>
+    <div class="nb-steps-grid">
+      <div class="nb-step-card">
+        <div class="nb-step-num">1</div>
+        <h3>{{ "Choose your game" if is_en else "اختر لعبتك" }}</h3>
+        <p>{{ "Browse our catalog of 30+ games and select your favorite title" if is_en else "تصفح كتالوجنا الذي يضم أكثر من 30 لعبة واختر لعبتك المفضلة" }}</p>
+      </div>
+      <div class="nb-step-card">
+        <div class="nb-step-num">2</div>
+        <h3>{{ "Enter your ID" if is_en else "أدخل معرّفك" }}</h3>
+        <p>{{ "Enter your game ID and select the package you want" if is_en else "أدخل معرّف حسابك في اللعبة واختر الباقة المطلوبة" }}</p>
+      </div>
+      <div class="nb-step-card">
+        <div class="nb-step-num">3</div>
+        <h3>{{ "Instant delivery" if is_en else "تسليم فوري" }}</h3>
+        <p>{{ "Pay securely and receive your items within seconds" if is_en else "ادفع بأمان واستلم العناصر خلال ثوانٍ معدودة" }}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ═══════ PAYMENT METHODS ═══════ #}
+<section class="nb-section nb-reveal" id="payment-methods">
+  <div class="container">
+    <div class="nb-section-head">
+      <div class="nb-section-pill purple">💳 {{ "Flexible" if is_en else "مرنة" }}</div>
+      <h2 class="nb-section-title">{{ "Pay" if is_en else "ادفع" }} <span class="gradient">{{ "your way" if is_en else "بطريقتك" }}</span></h2>
+      <p class="nb-section-sub">{{ "Multiple secure payment options for your convenience" if is_en else "خيارات دفع متعددة وآمنة لراحتك" }}</p>
+    </div>
+    <div class="nb-payment-grid">
+      <div class="nb-payment-item">💳 VISA / Mastercard</div>
+      <div class="nb-payment-item">🪙 USDT (TRC20)</div>
+      <div class="nb-payment-item">🏦 {{ "SYP Transfer" if is_en else "تحويل ل.س" }}</div>
+      <div class="nb-payment-item">📱 {{ "Mobile Balance" if is_en else "رصيد الموبايل" }}</div>
+      <div class="nb-payment-item">💰 {{ "Site Wallet" if is_en else "محفظة الموقع" }}</div>
+    </div>
+  </div>
+</section>
+
+{# ═══════ TESTIMONIALS ═══════ #}
+<section class="nb-section nb-reveal" id="testimonials">
+  <div class="container">
+    <div class="nb-section-head">
+      <div class="nb-section-pill magenta">❤️ {{ "Loved by gamers" if is_en else "محبوب من اللاعبين" }}</div>
+      <h2 class="nb-section-title">{{ "What our" if is_en else "ماذا يقول" }} <span class="gradient">{{ "customers say" if is_en else "عملاؤنا" }}</span></h2>
+    </div>
+    <div class="nb-testimonials-track">
+      <div class="nb-testimonials-inner">
+        <div class="nb-testimonial-card">
+          <div class="nb-testimonial-stars">★★★★★</div>
+          <p class="nb-testimonial-text">{{ "Fastest service I've ever used! Got my UC in PUBG within 10 seconds." if is_en else "أسرع خدمة جربتها! حصلت على شدات ببجي خلال 10 ثوانٍ." }}</p>
+          <div class="nb-testimonial-author">{{ "Ahmad M." if is_en else "أحمد م." }}</div>
+        </div>
+        <div class="nb-testimonial-card">
+          <div class="nb-testimonial-stars">★★★★★</div>
+          <p class="nb-testimonial-text">{{ "Great prices and reliable delivery. Been using TecnoGems for 6 months now." if is_en else "أسعار ممتازة وتسليم موثوق. أستخدم تكنوجيمز منذ 6 أشهر." }}</p>
+          <div class="nb-testimonial-author">{{ "Sara K." if is_en else "سارة ك." }}</div>
+        </div>
+        <div class="nb-testimonial-card">
+          <div class="nb-testimonial-stars">★★★★★</div>
+          <p class="nb-testimonial-text">{{ "The support team is amazing. They helped me with my order in minutes." if is_en else "فريق الدعم رائع. ساعدوني بطلبي خلال دقائق." }}</p>
+          <div class="nb-testimonial-author">{{ "Omar R." if is_en else "عمر ر." }}</div>
+        </div>
+        <div class="nb-testimonial-card">
+          <div class="nb-testimonial-stars">★★★★★</div>
+          <p class="nb-testimonial-text">{{ "Best platform for Free Fire diamonds. Always my first choice!" if is_en else "أفضل منصة لجواهر فري فاير. دائماً خياري الأول!" }}</p>
+          <div class="nb-testimonial-author">{{ "Layla A." if is_en else "ليلى أ." }}</div>
+        </div>
+        {# Duplicate for infinite marquee #}
+        <div class="nb-testimonial-card">
+          <div class="nb-testimonial-stars">★★★★★</div>
+          <p class="nb-testimonial-text">{{ "Fastest service I've ever used! Got my UC in PUBG within 10 seconds." if is_en else "أسرع خدمة جربتها! حصلت على شدات ببجي خلال 10 ثوانٍ." }}</p>
+          <div class="nb-testimonial-author">{{ "Ahmad M." if is_en else "أحمد م." }}</div>
+        </div>
+        <div class="nb-testimonial-card">
+          <div class="nb-testimonial-stars">★★★★★</div>
+          <p class="nb-testimonial-text">{{ "Great prices and reliable delivery. Been using TecnoGems for 6 months now." if is_en else "أسعار ممتازة وتسليم موثوق. أستخدم تكنوجيمز منذ 6 أشهر." }}</p>
+          <div class="nb-testimonial-author">{{ "Sara K." if is_en else "سارة ك." }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ═══════ TRUST SIGNALS ═══════ #}
+<section class="nb-section nb-reveal" id="trust">
+  <div class="container">
+    <div class="nb-trust-grid">
+      <div class="nb-trust-item">
+        <span class="nb-trust-num">50K+</span>
+        <span class="nb-trust-label">{{ "Happy Customers" if is_en else "عميل سعيد" }}</span>
+      </div>
+      <div class="nb-trust-item">
+        <span class="nb-trust-num">{{ completed_orders_count or '1000+' }}</span>
+        <span class="nb-trust-label">{{ "Orders Completed" if is_en else "طلب منجز" }}</span>
+      </div>
+      <div class="nb-trust-item">
+        <span class="nb-trust-num">&lt;30s</span>
+        <span class="nb-trust-label">{{ "Avg. Delivery" if is_en else "متوسط التسليم" }}</span>
+      </div>
+      <div class="nb-trust-item">
+        <span class="nb-trust-num">24/7</span>
+        <span class="nb-trust-label">{{ "Support" if is_en else "دعم متواصل" }}</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ═══════ FAQ ═══════ #}
+<section class="nb-section nb-reveal" id="faq">
+  <div class="container">
+    <div class="nb-section-head">
+      <div class="nb-section-pill cyan">❓ {{ "FAQ" if is_en else "أسئلة شائعة" }}</div>
+      <h2 class="nb-section-title">{{ "Frequently" if is_en else "الأسئلة" }} <span class="gradient">{{ "Asked" if is_en else "الشائعة" }}</span></h2>
+    </div>
+    <div class="nb-faq-list">
+      <div class="nb-faq-item">
+        <button class="nb-faq-q" type="button">
+          {{ "How long does delivery take?" if is_en else "كم يستغرق التسليم؟" }}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="nb-faq-a">{{ "Most orders are delivered instantly within 10-30 seconds. In rare cases, it may take up to 5 minutes." if is_en else "معظم الطلبات تُسلّم فورياً خلال 10-30 ثانية. في حالات نادرة قد يستغرق حتى 5 دقائق." }}</div>
+      </div>
+      <div class="nb-faq-item">
+        <button class="nb-faq-q" type="button">
+          {{ "Is it safe to use?" if is_en else "هل الاستخدام آمن؟" }}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="nb-faq-a">{{ "Absolutely! We use SSL encryption and secure payment gateways. Your data is always protected." if is_en else "بالتأكيد! نستخدم تشفير SSL وبوابات دفع آمنة. بياناتك محمية دائماً." }}</div>
+      </div>
+      <div class="nb-faq-item">
+        <button class="nb-faq-q" type="button">
+          {{ "What payment methods do you accept?" if is_en else "ما هي طرق الدفع المقبولة؟" }}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="nb-faq-a">{{ "We accept VISA, Mastercard, USDT (TRC20), SYP bank transfers, mobile balance, and site wallet." if is_en else "نقبل VISA، ماستركارد، USDT (TRC20)، حوالات ل.س، رصيد الموبايل، ومحفظة الموقع." }}</div>
+      </div>
+      <div class="nb-faq-item">
+        <button class="nb-faq-q" type="button">
+          {{ "Can I get a refund?" if is_en else "هل يمكنني استرداد أموالي؟" }}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="nb-faq-a">{{ "If your order fails or is not delivered, we will refund you immediately. See our refund policy for details." if is_en else "إذا فشل طلبك أو لم يُسلّم، سنعيد لك المبلغ فوراً. راجع سياسة الاسترداد للتفاصيل." }}</div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <script src="{{ url_for('static', filename='js/pages/home.js') }}" defer nonce="{{ csp_nonce }}"></script>
 {% endblock %}
