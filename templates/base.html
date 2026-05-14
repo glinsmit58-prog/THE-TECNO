@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="description" content="{{ seo_description or 'TecnoGems منصة شحن ألعاب سريعة وآمنة لشحن ببجي، فري فاير، شدات، جواهر، بطاقات وألعاب موبايل بأسعار مناسبة وخدمة موثوقة.' }}">
-  <title>{{ seo_title or title or "TecnoGems - شحن ألعاب وبطاقات ألعاب بسرعة وأمان" }}</title>
+  <title>{{ seo_title or title or "TecnoGems - شحن ألعاب فوري وآمن" }}</title>
 
   <meta name="robots" content="index, follow">
   {% set _path = request.path.replace('/legacy', '') %}
@@ -14,7 +14,7 @@
   <link rel="alternate" hreflang="en" href="https://tecnogems.com/lang/en?next={{ _path }}">
   <link rel="alternate" hreflang="x-default" href="https://tecnogems.com{{ _path }}">
 
-  <meta property="og:title" content="{{ seo_title or title or 'TecnoGems - شحن ألعاب وبطاقات ألعاب' }}">
+  <meta property="og:title" content="{{ seo_title or title or 'TecnoGems - شحن ألعاب فوري' }}">
   <meta property="og:description" content="{{ seo_description or 'شحن ألعاب سريع وآمن: ببجي، فري فاير، بطاقات وألعاب موبايل عبر TecnoGems.' }}">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tecnogems.com{{ _path }}">
@@ -22,150 +22,106 @@
   <meta property="og:image" content="https://tecnogems.com{{ url_for('static', filename='img/tecnogems-logo.png') }}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://tecnogems.com{{ url_for('static', filename='img/tecnogems-logo.png') }}">
-  <meta name="theme-color" content="#7c3aed">
+  <meta name="theme-color" content="#0c0a14">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
 
-  <!-- V43: Cairo (headings) + Tajawal (body) + Inter (latin) — V57: + Orbitron (holographic) -->
+  {# V60 NEON: Cairo + Rakkas (mirrors the new design exactly) #}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&family=Inter:wght@400;500;600;700&family=Orbitron:wght@600;700;800;900&display=swap" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&family=Inter:wght@400;500;600;700&family=Orbitron:wght@600;700;800;900&display=swap"></noscript>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Rakkas&display=swap">
 
-  {# V45: unified single stylesheet (built from style.css + v35..v44-neon overrides). #}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/tecnogems.min.css') }}">
-  {# V56: Nebula redesign — Cyber-Neon Futuristic Dark Luxury #}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/v56-nebula.css') }}">
-  {# V57: COSMIC NEBULA — futurist cyber-fantasy (energy orbs, starfield, warp portals) #}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/v57-cosmic.css') }}">
+  {# V60: single neon stylesheet — ports the game-charger-hub design.
+     Legacy stylesheets (tecnogems.min.css / v56-nebula / v57-cosmic) are
+     intentionally NOT loaded so their look does not bleed through. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/v60-neon.css') }}">
   <link rel="preload" as="image" href="{{ url_for('static', filename='img/tecnogems-logo.webp') }}">
   <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
   <link rel="icon" type="image/webp" href="{{ url_for('static', filename='img/logo-32.webp') }}">
 
   <script type="application/ld+json" nonce="{{ csp_nonce }}">{"@context":"https://schema.org","@type":"Organization","name":"TecnoGems","url":"https://tecnogems.com","logo":"https://tecnogems.com{{ url_for('static', filename='img/tecnogems-logo.png') }}","sameAs":["https://wa.me/{{ whatsapp_number or '' }}","https://t.me/{{ telegram_username or '' }}"]}</script>
   <script type="application/ld+json" nonce="{{ csp_nonce }}">{"@context":"https://schema.org","@type":"WebSite","name":"TecnoGems","url":"https://tecnogems.com","potentialAction":{"@type":"SearchAction","target":"https://tecnogems.com/games?q={search_term_string}","query-input":"required name=search_term_string"}}</script>
-
-  <!-- V44: force dark theme always (light/dark toggle removed) -->
-  <script nonce="{{ csp_nonce }}">
-    (function(){
-      try {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        localStorage.setItem('tg-theme', 'dark');
-      } catch(e){}
-    })();
-  </script>
 </head>
-<body class="{{ site_theme }}">
+<body class="v60-body">
 
-  {# V57: COSMIC stage — 3D parallax starfield, nebula clouds, planets, scanline + chromatic FX #}
-  <div id="cs-stage" aria-hidden="true">
-    <span class="cs-nebula n1"></span>
-    <span class="cs-nebula n2"></span>
-    <span class="cs-nebula n3"></span>
-    <span class="cs-planet p1"></span>
-    <span class="cs-planet p2"></span>
-    <canvas id="cs-stars"></canvas>
-  </div>
-  <canvas id="cs-particles" aria-hidden="true"></canvas>
-  <div id="cs-fx" aria-hidden="true"></div>
+  {% set _ico = 'width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' %}
 
-  <nav class="tg-nav v43-nav">
-    <div class="container tg-nav-inner">
-      <a class="tg-brand tg-brand-image" href="{{ url_for('home') }}" aria-label="TecnoGems">
-        <picture>
-          <source srcset="{{ url_for('static', filename='img/tecnogems-logo.webp') }}" type="image/webp">
-          <img src="{{ url_for('static', filename='img/tecnogems-logo.png') }}" alt="TecnoGems Logo" width="180" height="64" loading="eager" decoding="async">
-        </picture>
+  <header class="v60-nav" id="v60-nav">
+    <div class="v60-nav-inner">
+      <a class="v60-brand" href="{{ url_for('home') }}" aria-label="TecnoGems">
+        <span class="v60-brand-logo">
+          {# Gamepad icon — same as the new design #}
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="6" y1="11" x2="10" y2="11"></line>
+            <line x1="8" y1="9" x2="8" y2="13"></line>
+            <line x1="15" y1="12" x2="15.01" y2="12"></line>
+            <line x1="18" y1="10" x2="18.01" y2="10"></line>
+            <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258A4 4 0 0 0 17.32 5z"></path>
+          </svg>
+        </span>
+        <span>TecnoGems</span>
       </a>
 
-      {# V48: PRIMARY ACTIONS — always visible (outside collapsible menu) so
-         guests always see Login/Register and signed-in users always see balance.
-         The hamburger toggle controls only the secondary navigation links. #}
-      <div class="tg-nav-primary">
+      {# Desktop primary nav #}
+      <nav class="v60-nav-links" aria-label="primary">
+        <a href="{{ url_for('home') }}#games">{{ "Games" if is_en else "الألعاب" }}</a>
+        <a href="{{ url_for('home') }}#features">{{ "Why us" if is_en else "لماذا نحن" }}</a>
+        <a href="{{ url_for('home') }}#how-it-works">{{ "How it works" if is_en else "كيف يعمل" }}</a>
         {% if current_user %}
-          <a class="tg-nav-link tg-nav-balance" href="{{ url_for('wallet') }}" title="{{ t('balance') }}">
-            {# V49.1: replaced the old $-like stroke icon with a neutral wallet
-               glyph so SYP balances don't appear to be prefixed with a dollar
-               sign. The amount itself already carries its correct unit suffix
-               (ل.س for SYP, $ for USD) via wallet_money(). #}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2H5a2 2 0 0 1-2-2z"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2"/><path d="M17 14h.01"/></svg>
+          <a href="{{ url_for('wallet') }}">{{ t("topup_wallet") }}</a>
+          <a href="{{ url_for('orders') }}">{{ t("my_orders") }}</a>
+          {% if current_user.role == 'admin' %}
+            <a href="{{ url_for('admin_dashboard') }}" style="color:var(--neon)">{{ "Admin" if is_en else "الإدارة" }}</a>
+          {% endif %}
+        {% else %}
+          <a href="{{ url_for('contact') }}">{{ "Support" if is_en else "الدعم" }}</a>
+        {% endif %}
+      </nav>
+
+      <div class="v60-nav-actions">
+        {% if current_user %}
+          <a class="v60-nav-balance" href="{{ url_for('wallet') }}" title="{{ t('balance') }}">
+            <svg {{ _ico|safe }}><path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2H5a2 2 0 0 1-2-2z"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2"/><path d="M17 14h.01"/></svg>
             <span>{{ wallet_money(current_user.balance) }}</span>
           </a>
-          <a class="tg-nav-link tg-nav-topup" href="{{ url_for('wallet') }}#deposit-card">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
-            <span>{{ t("topup_wallet") }}</span>
+          <a class="v60-btn v60-btn-glass" href="{{ url_for('profile') }}" title="{{ 'Profile' if is_en else 'الملف الشخصي' }}">
+            <svg {{ _ico|safe }}><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          </a>
+          <a id="tg-logout-link" class="v60-btn v60-btn-ghost" href="#" title="{{ t('logout') }}">
+            <svg {{ _ico|safe }}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
           </a>
         {% else %}
-          <a class="tg-nav-login" href="{{ url_for('auth.login') }}">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></svg>
-            <span>{{ t("login") }}</span>
-          </a>
-          <a class="tg-nav-cta" href="{{ url_for('auth.register') }}">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M19 8v4M21 10h-4"/></svg>
-            <span>{{ t("register") }}</span>
-          </a>
+          <a class="v60-btn v60-btn-ghost" href="{{ url_for('auth.login') }}">{{ t("login") }}</a>
+          <a class="v60-btn v60-btn-primary" href="{{ url_for('auth.register') }}">{{ t("register") }}</a>
         {% endif %}
-        {% if nav_mode != 'direct' %}
-        <button id="tg-menu-toggle" class="tg-menu-toggle" type="button" aria-label="{{ t('menu') }}">☰ {{ t('menu') }}</button>
-        <button class="cs-crystal-btn" type="button" aria-label="{{ t('menu') }}" aria-expanded="false">
-          <span class="cs-crystal"><span></span></span>
+        <button id="v60-menu-btn" class="v60-menu-toggle" type="button" aria-label="{{ t('menu') }}" aria-expanded="false">
+          <svg {{ _ico|safe }} width="20" height="20"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
-        {% endif %}
-      </div>
-
-      {% if nav_mode == 'direct' %}
-      <div class="tg-links tg-menu-direct">
-      {% else %}
-      <div class="tg-links tg-menu">
-      {% endif %}
-        {# V44.1: unified SVG-icon nav matching guest style #}
-        {% set _ico = 'width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' %}
-        <a class="tg-nav-link" href="{{ url_for('home') }}">
-          <svg {{ _ico|safe }}><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
-          <span>{{ t("home") }}</span>
-        </a>
-        {% if current_user %}
-          <a class="tg-nav-link" href="{{ url_for('profile') }}">
-            <svg {{ _ico|safe }}><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
-            <span>{{ "Profile" if is_en else "الملف الشخصي" }}</span>
-          </a>
-          <a class="tg-nav-link" href="{{ url_for('orders') }}">
-            <svg {{ _ico|safe }}><path d="M3 7h18l-2 12H5z"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>
-            <span>{{ t("my_orders") }}</span>
-          </a>
-          <a class="tg-nav-link" href="{{ url_for('wallet_transactions') }}">
-            <svg {{ _ico|safe }}><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 11h20"/></svg>
-            <span>{{ t("wallet_records") }}</span>
-          </a>
-          {% if current_user.role == 'admin' %}
-            <span class="tg-nav-divider" aria-hidden="true"></span>
-            <a class="tg-nav-link tg-nav-admin" href="{{ url_for('admin_dashboard') }}">
-              <svg {{ _ico|safe }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-              <span>{{ "Admin" if is_en else "الإدارة" }}</span>
-            </a>
-            <a class="tg-nav-link tg-nav-deposits" href="{{ url_for('admin_deposits') }}">
-              <svg {{ _ico|safe }}><path d="M12 3v12"/><path d="m6 9 6 6 6-6"/><path d="M5 21h14"/></svg>
-              <span>{{ "Deposit requests" if is_en else "طلبات الرصيد" }}</span>
-            </a>
-            <a class="tg-nav-link" href="{{ url_for('admin_games') }}">
-              <svg {{ _ico|safe }}><rect x="2" y="7" width="20" height="12" rx="3"/><path d="M7 12h3M8.5 10.5v3M15 12h.01M18 14h.01"/></svg>
-              <span>{{ "Games" if is_en else "الألعاب" }}</span>
-            </a>
-            <a class="tg-nav-link" href="{{ url_for('admin_accounting') }}">
-              <svg {{ _ico|safe }}><path d="M3 3v18h18"/><path d="m7 15 4-4 4 4 5-7"/></svg>
-              <span>{{ "Profit" if is_en else "الأرباح" }}</span>
-            </a>
-          {% endif %}
-          <a id="tg-logout-link" class="tg-nav-link tg-nav-logout" href="#">
-            <svg {{ _ico|safe }}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
-            <span>{{ t("logout") }}</span>
-          </a>
-        {% endif %}
-        <a class="tg-lang-inline" href="{{ lang_url('en' if lang == 'ar' else 'ar') }}">{{ '🇬🇧 EN' if lang == 'ar' else '🇸🇦 AR' }}</a>
       </div>
     </div>
-  </nav>
 
-  <main class="container">
+    {# Mobile menu panel #}
+    <div class="v60-mobile-panel" id="v60-mobile-panel">
+      <a href="{{ url_for('home') }}#games">{{ "Games" if is_en else "الألعاب" }}</a>
+      <a href="{{ url_for('home') }}#features">{{ "Why us" if is_en else "لماذا نحن" }}</a>
+      <a href="{{ url_for('home') }}#how-it-works">{{ "How it works" if is_en else "كيف يعمل" }}</a>
+      <a href="{{ url_for('all_games') }}">{{ "All games" if is_en else "جميع الألعاب" }}</a>
+      {% if current_user %}
+        <a href="{{ url_for('wallet') }}">{{ t("topup_wallet") }}</a>
+        <a href="{{ url_for('orders') }}">{{ t("my_orders") }}</a>
+        <a href="{{ url_for('wallet_transactions') }}">{{ t("wallet_records") }}</a>
+        <a href="{{ url_for('profile') }}">{{ "Profile" if is_en else "الملف الشخصي" }}</a>
+        {% if current_user.role == 'admin' %}
+          <a href="{{ url_for('admin_dashboard') }}" style="color:var(--neon)">{{ "Admin" if is_en else "الإدارة" }}</a>
+        {% endif %}
+      {% else %}
+        <a href="{{ url_for('auth.login') }}">{{ t("login") }}</a>
+        <a href="{{ url_for('auth.register') }}">{{ t("register") }}</a>
+      {% endif %}
+      <a href="{{ lang_url('en' if lang == 'ar' else 'ar') }}">{{ '🇬🇧 English' if lang == 'ar' else '🇸🇦 العربية' }}</a>
+    </div>
+  </header>
+
+  <main>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <div class="messages">
@@ -178,136 +134,117 @@
     {% block content %}{% endblock %}
   </main>
 
-<footer class="footer v43-footer">
-  <div class="v43-footer-grid container">
-    <div class="v43-footer-col">
-      <div class="tg-footer-brand">TecnoGems</div>
-      <p class="v43-footer-tagline">{{ "Fast & Secure Game Top-Up" if is_en else "شحن ألعاب سريع وآمن" }}</p>
-    </div>
-    <div class="v43-footer-col">
-      <h4>{{ "Links" if is_en else "روابط" }}</h4>
-      <a href="{{ url_for('home') }}">{{ t("home") }}</a>
-      <a href="{{ url_for('auth.login') }}">{{ t("login") }}</a>
-      <a href="{{ url_for('auth.register') }}">{{ t("register") }}</a>
-    </div>
-    <div class="v43-footer-col">
-      <h4>{{ "Legal" if is_en else "قانوني" }}</h4>
-      <a href="{{ url_for('privacy') }}">{{ "Privacy Policy" if is_en else "سياسة الخصوصية" }}</a>
-      <a href="{{ url_for('terms') }}">{{ "Terms of Service" if is_en else "شروط الاستخدام" }}</a>
-      <a href="{{ url_for('refund') }}">{{ "Refund Policy" if is_en else "سياسة الاسترجاع" }}</a>
-      <a href="{{ url_for('contact') }}">{{ "Contact Us" if is_en else "اتصل بنا" }}</a>
-    </div>
-    <div class="v43-footer-col">
-      <h4>{{ "Support" if is_en else "الدعم" }}</h4>
-      {% if whatsapp_number %}<a href="https://wa.me/{{ whatsapp_number }}" target="_blank" rel="noopener">WhatsApp</a>{% endif %}
-      {% if telegram_username %}<a href="https://t.me/{{ telegram_username }}" target="_blank" rel="noopener">Telegram</a>{% endif %}
-    </div>
-    <div class="v43-footer-col">
-      <h4>{{ "Payment" if is_en else "طرق الدفع" }}</h4>
-      <div class="v43-pay-badges" aria-label="Payment methods">
-        <span class="v43-pay">VISA</span>
-        <span class="v43-pay">M/C</span>
-        <span class="v43-pay">USDT</span>
-        <span class="v43-pay">SYP</span>
+  <footer class="v60-footer">
+    <div class="v60-footer-grid">
+      <div class="v60-footer-col">
+        <div class="v60-brand" style="margin-bottom:0.8rem">
+          <span class="v60-brand-logo">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="6" y1="11" x2="10" y2="11"></line><line x1="8" y1="9" x2="8" y2="13"></line>
+              <line x1="15" y1="12" x2="15.01" y2="12"></line><line x1="18" y1="10" x2="18.01" y2="10"></line>
+              <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258A4 4 0 0 0 17.32 5z"></path>
+            </svg>
+          </span>
+          <span>TecnoGems</span>
+        </div>
+        <p>{{ "First top-up platform for Arab gamers." if is_en else "منصة شحن الألعاب الأولى للاعبين العرب." }}</p>
+      </div>
+      <div class="v60-footer-col">
+        <h4>{{ "Quick links" if is_en else "روابط سريعة" }}</h4>
+        <a href="{{ url_for('home') }}#games">{{ "Games" if is_en else "الألعاب" }}</a>
+        <a href="{{ url_for('all_games') }}">{{ "All games" if is_en else "جميع الألعاب" }}</a>
+        {% if current_user %}<a href="{{ url_for('wallet') }}">{{ t("topup_wallet") }}</a>{% endif %}
+        <a href="{{ url_for('contact') }}">{{ "Contact us" if is_en else "تواصل معنا" }}</a>
+      </div>
+      <div class="v60-footer-col">
+        <h4>{{ "Support" if is_en else "الدعم" }}</h4>
+        {% if whatsapp_number %}<a href="https://wa.me/{{ whatsapp_number }}" target="_blank" rel="noopener">WhatsApp</a>{% endif %}
+        {% if telegram_username %}<a href="https://t.me/{{ telegram_username }}" target="_blank" rel="noopener">Telegram</a>{% endif %}
+        <a href="{{ url_for('contact') }}">{{ "Contact" if is_en else "اتصل بنا" }}</a>
+        <a href="{{ url_for('refund') }}">{{ "Refund" if is_en else "الاسترجاع" }}</a>
+      </div>
+      <div class="v60-footer-col">
+        <h4>{{ "Legal" if is_en else "قانوني" }}</h4>
+        <a href="{{ url_for('privacy') }}">{{ "Privacy" if is_en else "الخصوصية" }}</a>
+        <a href="{{ url_for('terms') }}">{{ "Terms" if is_en else "الشروط" }}</a>
+        <a href="{{ lang_url('en' if lang == 'ar' else 'ar') }}">{{ 'English' if lang == 'ar' else 'العربية' }}</a>
       </div>
     </div>
-  </div>
-  <div class="v43-footer-bottom">© {{ now_year if now_year else '2025' }} TecnoGems</div>
-</footer>
+    <div class="v60-footer-bottom">
+      <span>© {{ now_year if now_year else '2026' }} TecnoGems. {{ "All rights reserved." if is_en else "جميع الحقوق محفوظة." }}</span>
+      <span style="display:inline-flex;align-items:center;gap:0.4rem">
+        <svg {{ _ico|safe }}><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3z"/><path d="M3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>
+        {{ "24/7 Arabic support" if is_en else "دعم 24/7 بالعربي" }}
+      </span>
+    </div>
+  </footer>
+
+  <button id="tg-to-top" class="tg-to-top" type="button" aria-label="Back to top">↑</button>
 
   <script src="{{ url_for('static', filename='js/app.min.js') }}" defer nonce="{{ csp_nonce }}"></script>
-  <script src="{{ url_for('static', filename='js/cosmic.js') }}" defer nonce="{{ csp_nonce }}"></script>
   <script nonce="{{ csp_nonce }}">
-    document.addEventListener('click', function (e) {
-      if (e.target && e.target.closest && e.target.closest('.tg-menu a')) {
-        document.body.classList.remove('menu-open');
-      }
-    });
-    function confirmLogout(e) {
-      e.preventDefault();
-      var modal = document.getElementById('logout-modal');
-      if (modal) { modal.style.display = 'flex'; }
-    }
-    // Wire up after DOM is ready (script loaded with defer)
     document.addEventListener('DOMContentLoaded', function(){
-      var toggle = document.getElementById('tg-menu-toggle');
-      if (toggle) {
-        toggle.addEventListener('click', function(){
-          document.body.classList.toggle('menu-open');
+      // Mobile menu
+      var btn = document.getElementById('v60-menu-btn');
+      var panel = document.getElementById('v60-mobile-panel');
+      if (btn && panel) {
+        btn.addEventListener('click', function(){
+          var open = panel.classList.toggle('is-open');
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        panel.addEventListener('click', function(e){
+          if (e.target.tagName === 'A') panel.classList.remove('is-open');
         });
       }
-      var logoutLink = document.getElementById('tg-logout-link');
-      if (logoutLink) logoutLink.addEventListener('click', confirmLogout);
 
-      var logoutCancel = document.getElementById('logout-cancel-btn');
-      if (logoutCancel) {
-        logoutCancel.addEventListener('click', function(){
-          document.getElementById('logout-modal').style.display='none';
+      // Logout confirmation
+      var logoutLink = document.getElementById('tg-logout-link');
+      if (logoutLink) {
+        logoutLink.addEventListener('click', function(e){
+          e.preventDefault();
+          var modal = document.getElementById('logout-modal');
+          if (modal) modal.style.display = 'flex';
         });
       }
-      var _logoutModal = document.getElementById('logout-modal');
-      if (_logoutModal) {
-        _logoutModal.addEventListener('click', function(e){
+      var modal = document.getElementById('logout-modal');
+      if (modal) {
+        modal.addEventListener('click', function(e){
           if (e.target === this) this.style.display = 'none';
         });
+      }
+
+      // Back to top + sticky shadow
+      var top = document.getElementById('tg-to-top');
+      var nav = document.getElementById('v60-nav');
+      function onScroll(){
+        if (window.scrollY > 380) top.classList.add('visible'); else top.classList.remove('visible');
+        if (nav) nav.style.boxShadow = (window.scrollY > 8) ? '0 8px 30px rgba(0,0,0,0.35)' : 'none';
+      }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+      if (top) top.addEventListener('click', function(){ window.scrollTo({ top: 0, behavior: 'smooth' }); });
+
+      // Service worker
+      if ('serviceWorker' in navigator && location.protocol === 'https:'){
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
       }
     });
   </script>
 
-<!-- V41: back-to-top button -->
-<button id="tg-to-top" class="tg-to-top" type="button" aria-label="Back to top">↑</button>
-<script nonce="{{ csp_nonce }}">
-(function(){
-  var btn = document.getElementById('tg-to-top');
-  if (btn){
-    var onScroll = function(){
-      if (window.scrollY > 380) btn.classList.add('visible');
-      else btn.classList.remove('visible');
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    btn.addEventListener('click', function(){ window.scrollTo({ top: 0, behavior: 'smooth' }); });
-  }
-
-  // V48: sticky header with subtle shadow when scrolled.
-  var nav = document.querySelector('.v43-nav');
-  if (nav){
-    var onScrollNav = function(){
-      if (window.scrollY > 8) nav.classList.add('is-stuck');
-      else nav.classList.remove('is-stuck');
-    };
-    window.addEventListener('scroll', onScrollNav, { passive: true });
-    onScrollNav();
-  }
-
-  // V44: theme toggle removed — site is always dark
-
-
-  // V43: Service Worker registration (kept from V42)
-  if ('serviceWorker' in navigator && location.protocol === 'https:'){
-    window.addEventListener('load', function(){
-      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
-    });
-  }
-})();
-</script>
-
-<!-- Logout confirm modal -->
-<div id="logout-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);align-items:center;justify-content:center">
-  <div class="logout-modal-box">
-    <h3>{{ "Sign out?" if is_en else "تسجيل الخروج؟" }}</h3>
-    <p>{{ "Are you sure you want to sign out?" if is_en else "هل تريد تسجيل الخروج من حسابك؟" }}</p>
-    <div class="logout-modal-actions">
-      {# V50.2 LOW: logout via POST (CSRF-protected) instead of a bare GET link.
-         The action now requires a valid CSRF token, so cross-site <img>/<a>
-         tricks cannot log the user out. #}
-      <form method="post" action="{{ url_for('auth.logout') }}" style="display:inline">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="btn primary" type="submit">{{ "Yes, sign out" if is_en else "نعم، خروج" }}</button>
-      </form>
-      <button type="button" class="btn" onclick="document.getElementById('logout-modal').style.display='none'">{{ "Cancel" if is_en else "إلغاء" }}</button>
+  <!-- Logout confirm modal -->
+  <div id="logout-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.65);align-items:center;justify-content:center">
+    <div class="logout-modal-box">
+      <h3>{{ "Sign out?" if is_en else "تسجيل الخروج؟" }}</h3>
+      <p class="muted">{{ "Are you sure you want to sign out?" if is_en else "هل تريد تسجيل الخروج من حسابك؟" }}</p>
+      <div class="logout-modal-actions">
+        <form method="post" action="{{ url_for('auth.logout') }}" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn primary" type="submit">{{ "Yes, sign out" if is_en else "نعم، خروج" }}</button>
+        </form>
+        <button type="button" class="btn" onclick="document.getElementById('logout-modal').style.display='none'">{{ "Cancel" if is_en else "إلغاء" }}</button>
+      </div>
     </div>
   </div>
-</div>
 
 </body>
 </html>
