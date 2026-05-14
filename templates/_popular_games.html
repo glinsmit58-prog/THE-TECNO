@@ -1,4 +1,6 @@
-{# V56: Popular games — Nebula redesign with 3D cards #}
+{# V56: Popular games — V57 COSMIC orb track. The .cs-orb-track wrapper, the
+   holographic name layer (.cs-orb-name) and the hover info chips (.cs-orb-info)
+   are injected by /static/js/cosmic.js so this template stays minimal. #}
 <section class="tg-popular-section nb-reveal" id="games">
   <div class="container">
     <div class="tg-popular-head">
@@ -24,10 +26,14 @@
 
       <div class="tg-popular-grid" id="tg-popular-grid">
         {% for g in featured_games %}
+          {# V57: a game is "imageless" when no admin/custom image is set;
+             those become full crystal orbs with holographic 3D text. #}
+          {% set _has_img = (g.image_url or g.game_image_url) %}
           <a class="tg-popular-card"
              href="{{ url_for('products', provider=g.provider, game_key=g.game_key) }}"
              aria-label="{{ g.name }}"
-             data-name="{{ g.name|lower }}">
+             data-name="{{ g.name|lower }}"
+             {% if not _has_img %}data-imageless="1"{% endif %}>
             <img class="tg-popular-card-img"
                  src="{{ game_image(g) }}"
                  alt="{{ g.name }}"
