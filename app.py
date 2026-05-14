@@ -854,7 +854,8 @@ def smart_game_image_url(game):
 
 
 def game_image_url(game):
-    """Priority: admin uploaded/custom image -> bundled old game art -> smart generated fallback."""
+    """Priority: admin uploaded/custom image -> V60 neon hi-res art ->
+    bundled old game art -> smart generated fallback."""
     try:
         name = str((game or {}).get("name") or (game or {}).get("game_name") or "")
         key = str((game or {}).get("game_key") or "")
@@ -866,6 +867,24 @@ def game_image_url(game):
         return custom
 
     s = (name + " " + key).lower().replace("_", " ")
+
+    # V60 NEON: high-resolution 3:4 covers ported from the
+    # game-charger-hub design package — used for the new home/games grids.
+    neon = {
+        "pubg":           "game-pubg.jpg",
+        "free fire":      "game-freefire.jpg",
+        "freefire":       "game-freefire.jpg",
+        "mobile legends": "game-mlbb.jpg",
+        "mlbb":           "game-mlbb.jpg",
+        "call of duty":   "game-cod.jpg",
+        "cod":            "game-cod.jpg",
+        "genshin":        "game-genshin.jpg",
+        "fortnite":       "game-fortnite.jpg",
+    }
+    for needle, filename in neon.items():
+        if needle in s:
+            return url_for("static", filename=f"img/games-neon/{filename}")
+
     bundled = {
         "pubg": "pubg.jpg",
         "free fire": "free-fire.jpg",
