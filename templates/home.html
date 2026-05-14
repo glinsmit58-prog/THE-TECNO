@@ -4,9 +4,12 @@
 {# ═════════════════════ HERO — exact port of design/index.tsx ═════════════════════ #}
 <section class="v60-hero">
   <div class="v60-hero-bg-grid" aria-hidden="true"></div>
+  {# V60.1 perf: hero background image is decorative — deferred + low fetch
+     priority so it never blocks LCP on mobile (which doesn't need a 200KB
+     bg image to feel premium). #}
   <img class="v60-hero-bg-img" aria-hidden="true"
        src="{{ url_for('static', filename='img/games-neon/hero-gaming.jpg') }}"
-       alt="" width="1920" height="1080" loading="eager" decoding="async">
+       alt="" width="1920" height="1080" loading="lazy" decoding="async" fetchpriority="low">
   <div class="v60-hero-bg-fade" aria-hidden="true"></div>
 
   <div class="v60-hero-inner">
@@ -62,9 +65,9 @@
         {# Use the first featured game image if available, else fall back to PUBG asset shipped with the design. #}
         {% set _hero_game = featured_games[0] if featured_games and featured_games|length > 0 else None %}
         {% if _hero_game %}
-          <img src="{{ game_image(_hero_game) }}" alt="{{ _hero_game.name }}" width="768" height="1024" loading="eager" decoding="async">
+          <img src="{{ game_image(_hero_game) }}" alt="{{ _hero_game.name }}" width="600" height="800" loading="lazy" decoding="async">
         {% else %}
-          <img src="{{ url_for('static', filename='img/games-neon/game-pubg.jpg') }}" alt="PUBG Mobile" width="768" height="1024" loading="eager" decoding="async">
+          <img src="{{ url_for('static', filename='img/games-neon/game-pubg.jpg') }}" alt="PUBG Mobile" width="600" height="800" loading="lazy" decoding="async">
         {% endif %}
         <div class="v60-hero-card-fade"></div>
         <div class="v60-hero-card-info">

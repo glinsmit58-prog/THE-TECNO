@@ -2,7 +2,7 @@
 <html lang="{{ lang }}" dir="{{ 'ltr' if is_en else 'rtl' }}">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="description" content="{{ seo_description or 'TecnoGems منصة شحن ألعاب سريعة وآمنة لشحن ببجي، فري فاير، شدات، جواهر، بطاقات وألعاب موبايل بأسعار مناسبة وخدمة موثوقة.' }}">
   <title>{{ seo_title or title or "TecnoGems - شحن ألعاب فوري وآمن" }}</title>
@@ -25,10 +25,13 @@
   <meta name="theme-color" content="#0c0a14">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
 
-  {# V60 NEON: Cairo + Rakkas (mirrors the new design exactly) #}
+  {# V60.1 perf: Cairo only (Rakkas dropped — heavy + only used for headings).
+     Loaded async via media-print swap so it never blocks render. Cairo
+     covers both display + body now. #}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Rakkas&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap"></noscript>
 
   {# V60: single neon stylesheet — ports the game-charger-hub design.
      Legacy stylesheets (tecnogems.min.css / v56-nebula / v57-cosmic) are

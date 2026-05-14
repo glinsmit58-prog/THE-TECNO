@@ -1,9 +1,13 @@
-// TecnoGems Service Worker — V42 batch2
+// TecnoGems Service Worker — V60 NEON
 // Strategy:
 //  - HTML pages: NetworkFirst (always try fresh, fallback to cache for offline)
 //  - Static assets (css/js/img/fonts): CacheFirst with background revalidate
 //  - Never cache API or admin routes
-const CACHE_VERSION = 'tg-v48-1';
+//
+// V60 fix: bumped CACHE_VERSION so every visitor purges the OLD cached
+// base.html (which still referenced v56-nebula / v57-cosmic stylesheets).
+// Also dropped pre-cached legacy CSS files that no longer exist.
+const CACHE_VERSION = 'tg-v60-2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGES_CACHE = `${CACHE_VERSION}-pages`;
 const OFFLINE_URL = '/';
@@ -12,9 +16,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) =>
       cache.addAll([
-        '/static/css/style.min.css',
-        '/static/css/v40-improvements.css',
-        '/static/css/v41-polish.css',
+        '/static/css/v60-neon.css',
         '/static/js/app.min.js',
         '/static/img/tecnogems-logo.webp',
         '/static/img/logo-32.webp',
