@@ -26,7 +26,8 @@
            aria-label="{{ g.name }}">
           <div class="v60-game-cover">
             <img src="{{ game_image(g) }}" alt="{{ g.name }}"
-                 loading="{% if loop.index <= 4 %}eager{% else %}lazy{% endif %}"
+                 loading="{% if loop.index <= 6 %}eager{% else %}lazy{% endif %}"
+                 fetchpriority="{% if loop.index <= 4 %}high{% else %}auto{% endif %}"
                  decoding="async" width="600" height="800">
             <div class="v60-game-cover-fade"></div>
             {% if loop.index <= 3 %}

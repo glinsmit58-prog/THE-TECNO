@@ -26,20 +26,31 @@
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
 
   {# V60.1 perf: Cairo only (Rakkas dropped — heavy + only used for headings).
-     Loaded async via media-print swap so it never blocks render. Cairo
-     covers both display + body now. #}
+     V61 perf: subset to weights actually used (700/800/900 for headings,
+     400 for body), display=swap so first paint never waits on the font. #}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap" media="print" onload="this.media='all'">
+  <link rel="preload" as="style"
+        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap">
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap"
+        media="print" onload="this.media='all';this.onload=null">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap"></noscript>
 
   {# V60: single neon stylesheet — ports the game-charger-hub design.
      Legacy stylesheets (tecnogems.min.css / v56-nebula / v57-cosmic) are
-     intentionally NOT loaded so their look does not bleed through. #}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/v60-neon.css') }}">
-  <link rel="preload" as="image" href="{{ url_for('static', filename='img/tecnogems-logo.webp') }}">
+     intentionally NOT loaded so their look does not bleed through.
+     V61: bumped query string so cached browsers pick up the smoother
+     game-card redesign without waiting on the SW to refresh. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/v60-neon.css') }}?v=61">
+  <link rel="preload" as="image" href="{{ url_for('static', filename='img/tecnogems-logo.webp') }}" fetchpriority="high">
   <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
   <link rel="icon" type="image/webp" href="{{ url_for('static', filename='img/logo-32.webp') }}">
+
+  {# V61 perf: speed up DNS + TLS for static asset CDN. dns-prefetch is
+     a cheap hint that costs nothing if the browser ignores it. #}
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
 
   <script type="application/ld+json" nonce="{{ csp_nonce }}">{"@context":"https://schema.org","@type":"Organization","name":"TecnoGems","url":"https://tecnogems.com","logo":"https://tecnogems.com{{ url_for('static', filename='img/tecnogems-logo.png') }}","sameAs":["https://wa.me/{{ whatsapp_number or '' }}","https://t.me/{{ telegram_username or '' }}"]}</script>
   <script type="application/ld+json" nonce="{{ csp_nonce }}">{"@context":"https://schema.org","@type":"WebSite","name":"TecnoGems","url":"https://tecnogems.com","potentialAction":{"@type":"SearchAction","target":"https://tecnogems.com/games?q={search_term_string}","query-input":"required name=search_term_string"}}</script>
@@ -216,15 +227,34 @@
         });
       }
 
-      // Back to top + sticky shadow
+      // Back to top + sticky shadow — V61 perf: throttle with rAF and
+      // only mutate the DOM when the boolean state actually changes. The
+      // old listener wrote style.boxShadow on every scroll event which is
+      // a layout-trigger no-no on mid-range Android.
       var top = document.getElementById('tg-to-top');
       var nav = document.getElementById('v60-nav');
-      function onScroll(){
-        if (window.scrollY > 380) top.classList.add('visible'); else top.classList.remove('visible');
-        if (nav) nav.style.boxShadow = (window.scrollY > 8) ? '0 8px 30px rgba(0,0,0,0.35)' : 'none';
+      var lastTop = false, lastScrolled = false, scheduled = false;
+      function applyState() {
+        scheduled = false;
+        var y = window.scrollY;
+        var nowTop = y > 380;
+        var nowScrolled = y > 8;
+        if (nowTop !== lastTop) {
+          if (top) top.classList.toggle('visible', nowTop);
+          lastTop = nowTop;
+        }
+        if (nowScrolled !== lastScrolled) {
+          if (nav) nav.style.boxShadow = nowScrolled ? '0 8px 30px rgba(0,0,0,0.35)' : 'none';
+          lastScrolled = nowScrolled;
+        }
+      }
+      function onScroll() {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(applyState);
       }
       window.addEventListener('scroll', onScroll, { passive: true });
-      onScroll();
+      applyState();
       if (top) top.addEventListener('click', function(){ window.scrollTo({ top: 0, behavior: 'smooth' }); });
 
       // Service worker

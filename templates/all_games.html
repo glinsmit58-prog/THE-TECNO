@@ -13,14 +13,17 @@
     <input id="gameSearch" class="tg-search-input" type="search" placeholder="{{ ('Search a game...' if is_en else 'ابحث عن لعبة...') }}">
   </div>
 
-  <div class="v60-games-grid" id="games-grid" style="max-width:1280px;margin:0 auto;padding:0 1.5rem 4rem">
+  <div class="v60-games-grid" id="games-grid" style="max-width:1280px;margin:0 auto;padding:0 1rem 4rem">
     {% for g in home_groups %}
       {% set img = g.game_image_url if g.game_image_url else url_for('static', filename='img/games-neon/game-pubg.jpg') %}
       <a class="v60-game-card searchable-game"
          data-name="{{ (g.game_name ~ ' ' ~ g.name)|lower }}"
          href="{{ url_for('products_group', provider=g.provider, game_key=g.game_key, group_id=g.id) }}">
         <div class="v60-game-cover">
-          <img src="{{ img }}" alt="{{ g.game_name }} - {{ g.name }}" loading="{% if loop.index <= 8 %}eager{% else %}lazy{% endif %}" decoding="async" width="600" height="800">
+          <img src="{{ img }}" alt="{{ g.game_name }} - {{ g.name }}"
+               loading="{% if loop.index <= 8 %}eager{% else %}lazy{% endif %}"
+               fetchpriority="{% if loop.index <= 4 %}high{% else %}auto{% endif %}"
+               decoding="async" width="600" height="800">
           <div class="v60-game-cover-fade"></div>
         </div>
         <div class="v60-game-body">
@@ -28,7 +31,7 @@
             <h3 class="v60-game-title">{{ g.game_name }} — {{ g.name }}</h3>
           </div>
           <div class="v60-game-row" style="padding-top:0.4rem">
-            <span class="v60-game-price">{{ g.product_count or 0 }} {{ "packs" if is_en else "باقة" }}</span>
+            <span class="v60-game-tag">{{ g.product_count or 0 }} {{ "packs" if is_en else "باقة" }}</span>
             <span class="v60-game-cta">{{ "Top up" if is_en else "اشحن الآن" }}
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{% if is_en %}<polyline points="9 18 15 12 9 6"/>{% else %}<polyline points="15 18 9 12 15 6"/>{% endif %}</svg>
             </span>
@@ -42,7 +45,10 @@
          data-name="{{ g.name|lower }}"
          href="{{ url_for('products', provider=g.provider, game_key=g.game_key) }}">
         <div class="v60-game-cover">
-          <img src="{{ game_image(g) }}" alt="{{ g.name }}" loading="{% if loop.index <= 8 %}eager{% else %}lazy{% endif %}" decoding="async" width="600" height="800">
+          <img src="{{ game_image(g) }}" alt="{{ g.name }}"
+               loading="{% if loop.index <= 8 %}eager{% else %}lazy{% endif %}"
+               fetchpriority="{% if loop.index <= 4 %}high{% else %}auto{% endif %}"
+               decoding="async" width="600" height="800">
           <div class="v60-game-cover-fade"></div>
           {% if loop.index <= 3 %}
             <span class="v60-hot-badge">
