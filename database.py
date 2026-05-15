@@ -1705,9 +1705,88 @@ def seed_local_provider_catalog(force=False):
 
 
 # ===================== V44: attach generated game posters =====================
+# V63: 107 new posters were added (game-covers package). Many regional
+# variants share the same artwork (e.g. genshin_impact_brazil should reuse
+# genshin_impact.webp), and a few keys differ slightly from the poster
+# filename (e.g. eafc_mobile_singapore -> fc_mobile, arknight_endfield ->
+# arknights_endfield). The lookup below adds:
+#   1. base-name fallback (drop trailing region/suffix segments).
+#   2. an explicit alias table for keys that don't follow the pattern.
+_POSTER_ALIASES = {
+    # Free Fire family (all regions share the same cover).
+    "freefire": "free_fire",
+    "freefire_bangladesh": "free_fire",
+    "freefire_brazil": "free_fire",
+    "freefire_europe": "free_fire",
+    "freefire_global": "free_fire",
+    "freefire_indonesia": "free_fire",
+    "freefire_latam": "free_fire",
+    "freefire_middle_east": "free_fire",
+    "freefire_sg": "free_fire",
+    "freefire_sgmy": "free_fire",
+    "freefire_taiwan": "free_fire",
+    "freefire_thailand": "free_fire",
+    "freefire_vietnam": "free_fire",
+    # FC Mobile / EAFC family.
+    "eafc_24": "fc_mobile",
+    "eafc_mobile_cambodia": "fc_mobile",
+    "eafc_mobile_malaysia": "fc_mobile",
+    "eafc_mobile_singapore": "fc_mobile",
+    # Slight name mismatches between catalog slug and poster filename.
+    "age_of_empire_mobile": "age_of_empires_mobile",
+    "arknight_endfield": "arknights_endfield",
+    "cats_crash_arena_turbo_stars": "cats_arena",
+    "crossfire_legend": "crossfire_mobile",
+    "garena_deltaforce_malaysia": "delta_force",
+    "garena_deltaforce_singapore": "delta_force",
+    "gov_nikke": "goddess_of_victory_nikke",
+    "harry_potter_magic_awaken": "harry_potter_magic_awakened",
+    "legend_of_the_phoenix": "legend_of_phoenix",
+    "lord_of_the_rings_rise_to_war": "lord_of_rings_war",
+    "puzzles_and_survival": "puzzles_survival",
+    "ragnarok_crush": "ragnarok_origin",
+    "ragnarok_idle_adventure_plus": "ragnarok_origin",
+    "sky_children_of_the_light": "sky_children_light",
+    "undawn_global": "garena_undawn",
+}
+
+
+def _resolve_poster_key(gk, available):
+    """Return the poster basename to use for a given game_key, or None.
+
+    Resolution order:
+      1. exact match against `available`
+      2. explicit alias table (`_POSTER_ALIASES`)
+      3. progressively drop trailing _segment(s) (e.g. genshin_impact_brazil
+         -> genshin_impact_brazil? no -> genshin_impact_brazil drop tail
+         -> genshin_impact -> match).
+    """
+    if not gk:
+        return None
+    if gk in available:
+        return gk
+    alias = _POSTER_ALIASES.get(gk)
+    if alias and alias in available:
+        return alias
+    parts = gk.split("_")
+    while len(parts) > 1:
+        parts.pop()
+        cand = "_".join(parts)
+        if cand in available:
+            return cand
+        cand_alias = _POSTER_ALIASES.get(cand)
+        if cand_alias and cand_alias in available:
+            return cand_alias
+    return None
+
+
 def attach_generated_posters():
-    """For every game whose image_url is empty, look for a matching poster in
-    static/img/games/{game_key}.webp and attach it. Won't overwrite admin uploads."""
+    """For every game whose image_url is empty, attach the closest matching
+    poster from static/img/games/. Admin uploads are never overwritten.
+
+    See `_resolve_poster_key` for the matching strategy (exact -> alias ->
+    base-name fallback). Returns the number of rows updated.
+    """
     import os as _os
     poster_dir = _os.path.join(_os.path.dirname(__file__), "static", "img", "games")
     if not _os.path.isdir(poster_dir):
@@ -1720,9 +1799,12 @@ def attach_generated_posters():
         rows = cur.execute("SELECT id, game_key, image_url FROM games").fetchall()
         updated = 0
         for r in rows:
+            if (r["image_url"] or "").strip():
+                continue
             gk = (r["game_key"] or "").lower()
-            if gk in available and not (r["image_url"] or "").strip():
-                url = f"/static/img/games/{gk}.webp"
+            match = _resolve_poster_key(gk, available)
+            if match:
+                url = f"/static/img/games/{match}.webp"
                 cur.execute("UPDATE games SET image_url=? WHERE id=?", (url, r["id"]))
                 updated += 1
         conn.commit()
