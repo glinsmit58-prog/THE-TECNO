@@ -870,7 +870,15 @@ def send_verification_email(to_email, token):
         button_url=link,
         footer_note="إذا لم تقم بإنشاء حساب في TecnoGems، يمكنك تجاهل هذه الرسالة بأمان.",
     )
-    send_email(to_email, "TecnoGems - تفعيل حسابك", body, html_body=html_body)
+    # V62.1 FIX: send synchronously so SMTP errors surface to the caller
+    # (registration / resend-verification) instead of being silently swallowed
+    # by the background queue. The async send_email() path was the reason
+    # users complained "test email arrives but verification email never does":
+    # send_email() returned immediately and any SMTP failure happened later
+    # in a thread / RQ worker and never reached the user.
+    if not email_is_configured():
+        raise RuntimeError("SMTP email settings are missing. Check .env")
+    _send_email_sync(to_email, "TecnoGems - تفعيل حسابك", body, html_body=html_body)
 
 
 def send_password_reset_email(to_email, token):
@@ -891,7 +899,11 @@ def send_password_reset_email(to_email, token):
         button_url=link,
         footer_note="إذا لم تطلب استعادة كلمة المرور، يمكنك تجاهل هذه الرسالة. حسابك آمن.",
     )
-    send_email(to_email, "TecnoGems - استعادة كلمة المرور", body, html_body=html_body)
+    # V62.1 FIX: same reason as send_verification_email — send synchronously
+    # so the user gets a real error message when SMTP misbehaves.
+    if not email_is_configured():
+        raise RuntimeError("SMTP email settings are missing. Check .env")
+    _send_email_sync(to_email, "TecnoGems - استعادة كلمة المرور", body, html_body=html_body)
 
 
 def send_email_change_confirmation(to_email, token):

@@ -16,12 +16,14 @@
   {% for g in groups %}
     <a class="tg-game-card searchable-group" href="{{ url_for('products_group', provider=provider, game_key=game.game_key, group_id=g.id) }}">
       <div class="tg-game-cover">
+        {# V62.1 FIX: previously fell back to react-assets/games/pubg.jpg which
+           made every imageless group look like PUBG. Use the game_image()
+           helper which already encodes the correct priority chain
+           (custom upload -> neon hi-res -> bundled art -> smart SVG fallback). #}
         {% if g.image_url %}
           <img src="{{ g.image_url }}" alt="{{ g.name }}" loading="lazy">
-        {% elif game.image_url %}
-          <img src="{{ game.image_url }}" alt="{{ g.name }}" loading="lazy">
         {% else %}
-          <img src="{{ url_for('static', filename='react-assets/games/pubg.jpg') }}" alt="{{ g.name }}" loading="lazy">
+          <img src="{{ game_image(game) }}" alt="{{ g.name }}" loading="lazy">
         {% endif %}
         <div class="tg-game-gradient"></div>
         
