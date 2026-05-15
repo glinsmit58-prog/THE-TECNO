@@ -738,8 +738,20 @@ def _send_email_sync(to_email, subject, body, html_body=None):
                 server.ehlo()
             server.login(MAIL_USERNAME, MAIL_PASSWORD)
             server.send_message(msg)
+        app.logger.info("Email sent successfully to=%s subject=%s", to_email, subject)
+    except smtplib.SMTPAuthenticationError as exc:
+        app.logger.error(
+            "Email AUTH FAILED to=%s subject=%s: %s. "
+            "تأكد من استخدام Gmail App Password (16 حرف بدون مسافات) في MAIL_PASSWORD وليس كلمة مرور الحساب العادية.",
+            to_email, subject, exc,
+        )
+        raise
+    except smtplib.SMTPException as exc:
+        app.logger.error("Email SMTP error to=%s subject=%s: %s", to_email, subject, exc)
+        raise
     except Exception as exc:
-        app.logger.error("Email send failed to=%s: %s", to_email, exc)
+        app.logger.error("Email send failed to=%s subject=%s: %s", to_email, subject, exc)
+        raise
 
 
 def _email_worker():
@@ -2780,6 +2792,76 @@ def admin_payment_method_edit(method_id):
     return render_template("admin/payment_method_edit.html", method=method)
 
 
+@app.route("/admin/test-email", methods=["POST"])
+@login_required
+@admin_required
+@(limiter.limit("5 per minute") if limiter else (lambda f: f))
+def admin_test_email():
+    """Send a synchronous test email to the admin to verify SMTP works.
+
+    Sends directly (not via queue) so any error surfaces immediately in
+    the flash message — much easier to diagnose than queued failures.
+    """
+    admin = current_user()
+    target = (request.form.get("to") or admin["email"]).strip().lower()
+
+    if not email_is_configured():
+        flash(
+            "إعدادات SMTP غير مكتملة في .env. تأكد من: MAIL_SERVER, MAIL_PORT, "
+            "MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM",
+            "danger",
+        )
+        return redirect(url_for("admin_settings"))
+
+    try:
+        link = f"{BASE_URL}/admin"
+        body = (
+            "هذا اختبار إرسال البريد من TecnoGems.\n\n"
+            f"الخادم: {MAIL_SERVER}:{MAIL_PORT}\n"
+            f"المستخدم: {MAIL_USERNAME}\n"
+            f"المرسل من: {MAIL_FROM}\n\n"
+            "إذا وصلتك هذه الرسالة، فإعدادات الإيميل تعمل بنجاح."
+        )
+        html_body = _build_email_html(
+            title="اختبار الإيميل - TecnoGems",
+            greeting="رسالة اختبار",
+            message=(
+                "تم إرسال هذه الرسالة من لوحة الإدارة لاختبار إعدادات SMTP. "
+                f"الخادم: <code>{MAIL_SERVER}:{MAIL_PORT}</code>"
+            ),
+            button_text="فتح لوحة الإدارة",
+            button_url=link,
+            footer_note="إذا وصلتك هذه الرسالة، فإعدادات الإيميل تعمل بنجاح.",
+        )
+        # Bypass the queue: send synchronously so we can show the real error.
+        _send_email_sync(target, "TecnoGems - اختبار الإيميل", body, html_body=html_body)
+        flash(
+            f"تم إرسال إيميل الاختبار إلى {target}. تحقق من البريد الوارد و"
+            "مجلد الإيميلات غير المرغوبة (Spam).",
+            "success",
+        )
+    except smtplib.SMTPAuthenticationError as exc:
+        flash(
+            f"فشل التحقق من بيانات الدخول لخادم البريد. الخطأ: {exc}. "
+            "السبب الأكثر شيوعًا في Gmail: استخدام كلمة مرور الحساب العادية. "
+            "يجب استخدام App Password (16 حرفًا) من إعدادات Google. "
+            "اذهب إلى: https://myaccount.google.com/apppasswords",
+            "danger",
+        )
+    except smtplib.SMTPConnectError as exc:
+        flash(
+            f"تعذر الاتصال بخادم SMTP ({MAIL_SERVER}:{MAIL_PORT}). الخطأ: {exc}. "
+            "تأكد من صحة عنوان الخادم والبورت، وأن الـ firewall لا يحجبه.",
+            "danger",
+        )
+    except smtplib.SMTPException as exc:
+        flash(f"خطأ SMTP: {exc}", "danger")
+    except Exception as exc:
+        flash(f"خطأ غير متوقع: {type(exc).__name__}: {exc}", "danger")
+
+    return redirect(url_for("admin_settings"))
+
+
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -2834,6 +2916,13 @@ def admin_settings():
         show_groups_direct_setting=get_setting("show_groups_direct", "0"),
         old_games_layout_setting=get_setting("old_games_layout", "0"),
         auto_refund_on_failure_setting=get_setting("auto_refund_on_failure", "0"),
+        # SMTP diagnostics for the admin settings UI
+        smtp_server=MAIL_SERVER,
+        smtp_port=MAIL_PORT,
+        smtp_username=MAIL_USERNAME,
+        smtp_from=MAIL_FROM,
+        smtp_use_tls=MAIL_USE_TLS,
+        smtp_pw_len=len(MAIL_PASSWORD or ""),
     )
 
 

@@ -76,7 +76,31 @@
       <div class="alert warning">تنبيه: تفعيل البريد يحتاج إعدادات SMTP في ملف .env أولًا.</div>
     {% endif %}
 
-    
+    <div style="margin:20px 0;padding:16px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.25);border-radius:12px">
+      <h3 style="margin:0 0 12px;font-size:16px">حالة إعدادات البريد الإلكتروني (SMTP)</h3>
+      {% if email_is_configured %}
+        <table style="width:100%;font-size:13px;color:#cbd5e1">
+          <tr><td style="padding:4px 0;color:#94a3b8">الخادم:</td><td><code>{{ smtp_server }}:{{ smtp_port }}</code></td></tr>
+          <tr><td style="padding:4px 0;color:#94a3b8">المستخدم:</td><td><code>{{ smtp_username }}</code></td></tr>
+          <tr><td style="padding:4px 0;color:#94a3b8">المُرسِل من:</td><td><code>{{ smtp_from }}</code></td></tr>
+          <tr><td style="padding:4px 0;color:#94a3b8">TLS:</td><td>{{ "✓ مُفعّل" if smtp_use_tls else "✗ مُعطّل" }}</td></tr>
+          <tr><td style="padding:4px 0;color:#94a3b8">طول كلمة المرور:</td><td>{{ smtp_pw_len }} حرف</td></tr>
+        </table>
+        <p class="muted" style="margin:12px 0 8px;font-size:12px">
+          ملاحظة هامة لـ Gmail: يجب استخدام <b>App Password</b> (16 حرفًا بدون مسافات) وليس كلمة مرور الحساب.<br>
+          أنشئها من: <code>https://myaccount.google.com/apppasswords</code>
+        </p>
+      {% else %}
+        <p style="color:#fbbf24">إعدادات SMTP ناقصة في ملف <code>.env</code>. أضف القيم التالية:</p>
+        <pre style="background:#0f172a;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto;color:#cbd5e1">MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=1
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-16-char-app-password
+MAIL_FROM=your-email@gmail.com</pre>
+      {% endif %}
+    </div>
+
     <h2>وسائل التواصل الظاهرة للمستخدم</h2>
     <label>رقم واتساب</label>
     <input name="whatsapp_number" value="{{ whatsapp_number_setting or '' }}" placeholder="مثال: 963932607063 أو 12025550123">
@@ -86,7 +110,21 @@
     <input name="telegram_username" value="{{ telegram_username_setting or '' }}" placeholder="مثال: TecnoGemsSupport">
     <p class="muted">اكتب اليوزر بدون @. اتركه فارغًا لإخفاء زر تيليغرام.</p>
 
-<button class="btn primary" type="submit" style="margin-top:18px;width:100%">حفظ</button>
+    <button class="btn primary" type="submit" style="margin-top:18px;width:100%">حفظ</button>
   </form>
+
+  {% if email_is_configured %}
+  <div style="margin-top:20px;padding:16px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.25);border-radius:12px">
+    <h3 style="margin:0 0 12px;font-size:16px">اختبار إرسال البريد</h3>
+    <p class="muted" style="font-size:13px;margin:0 0 12px">
+      أرسل إيميل اختبار للتأكد من أن SMTP يعمل. سيتم الإرسال مباشرة (بدون طابور) لتظهر أي أخطاء فورًا.
+    </p>
+    <form method="post" action="{{ url_for('admin_test_email') }}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="email" name="to" placeholder="البريد المستلم (اتركه فارغًا لإرساله إليك)" style="flex:1;min-width:250px">
+      <button type="submit" class="btn primary">إرسال إيميل اختبار</button>
+    </form>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
