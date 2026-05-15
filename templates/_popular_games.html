@@ -18,6 +18,47 @@
       </label>
     </div>
 
+    {# V65: "الأكثر طلباً" horizontal-scroll carousel — small design addition
+       ported from neon-gaming-topup-updated/src/routes/index.tsx. Shows the
+       top featured games as a swipeable strip above the main grid. #}
+    {% if featured_games and featured_games|length >= 4 %}
+      <div class="v60-featured-row">
+        <div class="v60-featured-row-head">
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67z"/></svg>
+            {{ "Most popular" if is_en else "الأكثر طلباً" }}
+          </h3>
+          <span class="v60-featured-row-hint">{{ "Swipe →" if is_en else "اسحب للجانب →" }}</span>
+        </div>
+        <div class="v60-featured-track">
+          {% for g in featured_games[:8] %}
+            <a class="v60-featured-card"
+               href="{{ url_for('products', provider=g.provider, game_key=g.game_key) }}"
+               aria-label="{{ g.name }}">
+              <div class="v60-featured-cover">
+                <img src="{{ game_image(g) }}" alt="{{ g.name }}" loading="lazy" decoding="async" width="600" height="800">
+                <div class="v60-featured-fade"></div>
+                <span class="v60-featured-badge">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>
+                  {{ "Featured" if is_en else "مميز" }}
+                </span>
+                <div class="v60-featured-info">
+                  <h4>{{ g.name }}</h4>
+                  <span>
+                    {% if g.min_price and g.min_price > 0 %}
+                      {{ ("From" if is_en else "من") }} {{ product_price({'sell_price': g.min_price}) }}
+                    {% else %}
+                      {{ "Instant top-up" if is_en else "تسليم فوري" }}
+                    {% endif %}
+                  </span>
+                </div>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
     <div class="v60-games-grid" id="games-grid">
       {% for g in featured_games %}
         <a class="v60-game-card searchable-game"

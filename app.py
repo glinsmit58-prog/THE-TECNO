@@ -1035,14 +1035,24 @@ def smart_game_image_url(game):
 
 
 def _get_poster_available():
-    """Cache set of available poster basenames from static/img/games/*.webp."""
+    """Cache poster basenames -> file extension from static/img/games/.
+
+    V65: switched from a flat set of webp basenames to a {basename: ext} map
+    so we can serve the new high-res `.jpg` artwork without breaking the
+    handful of games still on the old `.webp` thumbnails. JPG takes priority
+    when both are present.
+    """
     if not hasattr(_get_poster_available, "_cache"):
         import os as _os
         poster_dir = _os.path.join(_os.path.dirname(__file__), "static", "img", "games")
+        ext_map = {}
         if _os.path.isdir(poster_dir):
-            _get_poster_available._cache = {f[:-5] for f in _os.listdir(poster_dir) if f.endswith(".webp")}
-        else:
-            _get_poster_available._cache = set()
+            for f in _os.listdir(poster_dir):
+                if f.endswith(".jpg"):
+                    ext_map[f[:-4]] = "jpg"
+                elif f.endswith(".webp") and f[:-5] not in ext_map:
+                    ext_map[f[:-5]] = "webp"
+        _get_poster_available._cache = ext_map
     return _get_poster_available._cache
 
 
@@ -1105,10 +1115,11 @@ def game_image_url(game):
     if custom:
         return custom
 
-    # 2. Match WebP poster by game_key (precise, no substring false-positives)
+    # 2. Match poster by game_key (precise, no substring false-positives)
     poster = _resolve_poster_for_display(key)
     if poster:
-        return url_for("static", filename=f"img/games/{poster}.webp")
+        ext = _get_poster_available().get(poster, "webp")
+        return url_for("static", filename=f"img/games/{poster}.{ext}")
 
     # 3. Smart SVG fallback (generated thumbnails)
     return smart_game_image_url(game)
