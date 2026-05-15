@@ -1034,9 +1034,66 @@ def smart_game_image_url(game):
 
 
 
+def _get_poster_available():
+    """Cache set of available poster basenames from static/img/games/*.webp."""
+    if not hasattr(_get_poster_available, "_cache"):
+        import os as _os
+        poster_dir = _os.path.join(_os.path.dirname(__file__), "static", "img", "games")
+        if _os.path.isdir(poster_dir):
+            _get_poster_available._cache = {f[:-5] for f in _os.listdir(poster_dir) if f.endswith(".webp")}
+        else:
+            _get_poster_available._cache = set()
+    return _get_poster_available._cache
+
+
+def _resolve_poster_for_display(game_key):
+    """Use the same resolution logic as database._resolve_poster_key to find
+    the correct WebP poster for a game_key at display time.
+
+    Resolution order:
+      1. exact match
+      2. explicit alias table (_POSTER_ALIASES from database.py)
+      3. progressively drop trailing _segment(s)
+    """
+    from database import _POSTER_ALIASES
+
+    available = _get_poster_available()
+    if not available or not game_key:
+        return None
+
+    gk = game_key.lower()
+
+    # 1. Exact match
+    if gk in available:
+        return gk
+
+    # 2. Alias table
+    alias = _POSTER_ALIASES.get(gk)
+    if alias and alias in available:
+        return alias
+
+    # 3. Progressive suffix stripping
+    parts = gk.split("_")
+    while len(parts) > 1:
+        parts.pop()
+        cand = "_".join(parts)
+        if cand in available:
+            return cand
+        cand_alias = _POSTER_ALIASES.get(cand)
+        if cand_alias and cand_alias in available:
+            return cand_alias
+
+    return None
+
+
 def game_image_url(game):
-    """Priority: admin uploaded/custom image -> V60 neon hi-res art ->
-    bundled old game art -> smart generated fallback."""
+    """Priority: admin uploaded/custom image -> matched WebP poster from
+    static/img/games/ -> smart SVG fallback.
+
+    V64: Replaced old substring-matching (which caused wrong images) with
+    precise game_key-based poster resolution using the same alias table and
+    suffix-stripping logic as attach_generated_posters().
+    """
     try:
         name = str((game or {}).get("name") or (game or {}).get("game_name") or "")
         key = str((game or {}).get("game_key") or "")
@@ -1044,57 +1101,16 @@ def game_image_url(game):
     except Exception:
         name, key, custom = str(game or ""), "", ""
 
+    # 1. Admin-uploaded or DB-assigned image (highest priority)
     if custom:
         return custom
 
-    s = (name + " " + key).lower().replace("_", " ")
+    # 2. Match WebP poster by game_key (precise, no substring false-positives)
+    poster = _resolve_poster_for_display(key)
+    if poster:
+        return url_for("static", filename=f"img/games/{poster}.webp")
 
-    # V60 NEON: high-resolution 3:4 covers ported from the
-    # game-charger-hub design package — used for the new home/games grids.
-    neon = {
-        "pubg":           "game-pubg.jpg",
-        "free fire":      "game-freefire.jpg",
-        "freefire":       "game-freefire.jpg",
-        "mobile legends": "game-mlbb.jpg",
-        "mlbb":           "game-mlbb.jpg",
-        "call of duty":   "game-cod.jpg",
-        "cod":            "game-cod.jpg",
-        "genshin":        "game-genshin.jpg",
-        "fortnite":       "game-fortnite.jpg",
-    }
-    for needle, filename in neon.items():
-        if needle in s:
-            return url_for("static", filename=f"img/games-neon/{filename}")
-
-    bundled = {
-        "pubg": "pubg.jpg",
-        "free fire": "free-fire.jpg",
-        "freefire": "free-fire.jpg",
-        "fc": "fc-mobile.jpg",
-        "fifa": "fifa.jpg",
-        "call of duty": "cod-mobile.jpg",
-        "cod": "cod-mobile.jpg",
-        "genshin": "genshin.jpg",
-        "valorant": "valorant.jpg",
-        "roblox": "roblox.jpg",
-        "minecraft": "minecraft.jpg",
-        "mobile legends": "mobile-legends.jpg",
-        "clash royale": "clash-royale.jpg",
-        "clash": "clash.jpg",
-        "8 ball": "8ball.jpg",
-        "stumble": "stumble.jpg",
-        "wild rift": "wild-rift.jpg",
-        "honor": "honor-kings.jpg",
-        "fortnite": "fortnite.jpg",
-        "aov": "aov.jpg",
-        "arena of valor": "aov.jpg",
-        "brawl": "brawl.jpg",
-        "apex": "apex.jpg",
-    }
-    for needle, filename in bundled.items():
-        if needle in s:
-            return url_for("static", filename=f"react-assets/games/{filename}")
-
+    # 3. Smart SVG fallback (generated thumbnails)
     return smart_game_image_url(game)
 
 
