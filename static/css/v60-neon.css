@@ -1630,3 +1630,157 @@ label {
   margin-bottom: 0.4rem;
 }
 .tg-breadcrumb a { color: var(--neon-2); }
+
+
+
+/* ======================================================================
+   V65: "الأكثر طلباً" featured carousel — small design addition ported
+   from neon-gaming-topup-updated/src/routes/index.tsx. Swipeable strip
+   sits above the main games grid on the home page only.
+   ====================================================================== */
+.v60-featured-row {
+  margin: 0 0 1.4rem;
+}
+@media (min-width: 768px) { .v60-featured-row { margin-bottom: 2rem; } }
+
+.v60-featured-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin: 0 0 0.7rem;
+}
+.v60-featured-row-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  margin: 0;
+  font-weight: 800;
+}
+@media (min-width: 768px) { .v60-featured-row-head h3 { font-size: 1.4rem; } }
+.v60-featured-row-head h3 svg { color: var(--neon); }
+.v60-featured-row-hint {
+  font-size: 0.72rem;
+  color: var(--fg-muted);
+  font-weight: 700;
+}
+
+.v60-featured-track {
+  display: flex;
+  gap: 0.8rem;
+  overflow-x: auto;
+  padding: 0.2rem 0.2rem 0.6rem;
+  scroll-snap-type: x mandatory;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.v60-featured-track::-webkit-scrollbar { display: none; }
+@media (min-width: 768px) { .v60-featured-track { gap: 1rem; } }
+
+.v60-featured-card {
+  position: relative;
+  flex: 0 0 60%;
+  max-width: 220px;
+  scroll-snap-align: start;
+  border-radius: 1.1rem;
+  overflow: hidden;
+  background: var(--gradient-card, linear-gradient(160deg, #1f1746 0%, #14102a 100%));
+  border: 1px solid rgba(255,255,255,0.08);
+  text-decoration: none;
+  color: var(--fg);
+  box-shadow: 0 10px 30px -10px rgba(217, 70, 239, 0.45);
+  transition: transform .28s cubic-bezier(.2, .7, .2, 1), box-shadow .28s ease, border-color .28s ease;
+}
+@media (min-width: 540px) { .v60-featured-card { flex: 0 0 240px; max-width: 240px; } }
+@media (min-width: 768px) { .v60-featured-card { flex: 0 0 260px; max-width: 260px; border-radius: 1.4rem; } }
+@media (hover: hover) {
+  .v60-featured-card:hover {
+    transform: translate3d(0, -4px, 0);
+    border-color: rgba(217, 70, 239, 0.45);
+    box-shadow:
+      0 18px 40px -16px rgba(217, 70, 239, 0.6),
+      0 8px 24px -10px rgba(34, 211, 238, 0.35);
+  }
+}
+
+.v60-featured-cover {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+}
+.v60-featured-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform .55s cubic-bezier(.2, .7, .2, 1);
+}
+@media (hover: hover) {
+  .v60-featured-card:hover .v60-featured-cover img { transform: scale(1.08); }
+}
+.v60-featured-fade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(20, 16, 42, 0.92) 0%,
+    rgba(20, 16, 42, 0.45) 35%,
+    transparent 65%
+  );
+  pointer-events: none;
+}
+.v60-featured-badge {
+  position: absolute;
+  top: 0.55rem;
+  inset-inline-end: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  color: #160b29;
+  background: linear-gradient(135deg, var(--neon, #d946ef), var(--neon-2, #22d3ee));
+  box-shadow: 0 4px 14px -4px rgba(217, 70, 239, 0.55);
+  z-index: 2;
+}
+@media (min-width: 768px) { .v60-featured-badge { font-size: 0.72rem; padding: 0.28rem 0.7rem; } }
+.v60-featured-badge svg { color: #160b29; }
+
+.v60-featured-info {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 0.7rem 0.85rem 0.85rem;
+  z-index: 2;
+}
+.v60-featured-info h4 {
+  margin: 0 0 0.2rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  line-height: 1.2;
+  font-weight: 800;
+  color: var(--fg);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+@media (min-width: 768px) { .v60-featured-info h4 { font-size: 1.2rem; } }
+.v60-featured-info span {
+  font-size: 0.72rem;
+  color: var(--neon-2);
+  font-weight: 700;
+}
+@media (min-width: 768px) { .v60-featured-info span { font-size: 0.78rem; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .v60-featured-card,
+  .v60-featured-cover img {
+    transition: none !important;
+  }
+  .v60-featured-card:hover { transform: none !important; }
+}

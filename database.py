@@ -1799,14 +1799,23 @@ def attach_generated_posters():
 
     See `_resolve_poster_key` for the matching strategy (exact -> alias ->
     base-name fallback). Returns the number of rows updated.
+
+    V65: posters can now be `.jpg` (new high-res artwork) or `.webp` (legacy
+    thumbnails). JPG is preferred when both exist for the same game_key.
     """
     import os as _os
     poster_dir = _os.path.join(_os.path.dirname(__file__), "static", "img", "games")
     if not _os.path.isdir(poster_dir):
         return 0
-    available = {f[:-5] for f in _os.listdir(poster_dir) if f.endswith(".webp")}
-    if not available:
+    ext_map = {}
+    for f in _os.listdir(poster_dir):
+        if f.endswith(".jpg"):
+            ext_map[f[:-4]] = "jpg"
+        elif f.endswith(".webp") and f[:-5] not in ext_map:
+            ext_map[f[:-5]] = "webp"
+    if not ext_map:
         return 0
+    available = set(ext_map.keys())
     with db_conn() as conn:
         cur = conn.cursor()
         rows = cur.execute("SELECT id, game_key, image_url FROM games").fetchall()
@@ -1817,7 +1826,7 @@ def attach_generated_posters():
             gk = (r["game_key"] or "").lower()
             match = _resolve_poster_key(gk, available)
             if match:
-                url = f"/static/img/games/{match}.webp"
+                url = f"/static/img/games/{match}.{ext_map[match]}"
                 cur.execute("UPDATE games SET image_url=? WHERE id=?", (url, r["id"]))
                 updated += 1
         conn.commit()
