@@ -1748,6 +1748,19 @@ _POSTER_ALIASES = {
     "ragnarok_idle_adventure_plus": "ragnarok_origin",
     "sky_children_of_the_light": "sky_children_light",
     "undawn_global": "garena_undawn",
+    # V64: Common short keys that admins might use manually.
+    "pubg": "pubg_mobile",
+    "mlbb": "mobile_legends",
+    "ml": "mobile_legends",
+    "cod": "call_of_duty_mobile",
+    "cod_mobile": "call_of_duty_mobile",
+    "lol": "league_of_legends",
+    "ff": "free_fire",
+    "free_fire_middle_east": "free_fire",
+    # Mobile Legends variants.
+    "mobile_legends_exclusive": "mobile_legends",
+    "mobile_legends_limited_promo": "mobile_legends",
+    "mobile_legends_special": "mobile_legends",
 }
 
 
