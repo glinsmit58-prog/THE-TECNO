@@ -15,7 +15,7 @@
 //     #1 reason mobile users felt the site was slow.
 //   - Pre-cache the new V61 CSS + the home page so first paint after
 //     install is instant (and offline-friendly).
-const CACHE_VERSION = 'tg-v62-1';
+const CACHE_VERSION = 'tg-v63-1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGES_CACHE = `${CACHE_VERSION}-pages`;
 const OFFLINE_URL = '/';

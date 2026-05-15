@@ -44,9 +44,12 @@
                    {% if not g.active %}disabled{% endif %}>
             إظهار في الرئيسية
           </label>
-          {% if g.image_url %}
-            <img src="{{ g.image_url }}" alt="{{ g.name }}" style="width:46px;height:46px;object-fit:cover;border-radius:12px;border:1px solid rgba(255,255,255,.12)">
-          {% endif %}
+          {# V62.1 FIX: was {% if g.image_url %} — that left a blank slot for
+             games without an admin upload. Use the game_image() helper so
+             the smart SVG fallback (static/img/smart-games/*.svg) is shown
+             for every game that doesn't have a custom image yet. #}
+          <img src="{{ game_image(g) }}" alt="{{ g.name }}" loading="lazy"
+               style="width:46px;height:46px;object-fit:cover;border-radius:12px;border:1px solid rgba(255,255,255,.12)">
           <a class="btn small" href="{{ url_for('admin_game_products', provider=g.provider, game_key=g.game_key) }}">ترتيب الباقات</a>
         </div>
       </div>
@@ -68,9 +71,9 @@
     {% for g in games %}
       <div class="admin-game-row" style="gap:10px">
         <div style="display:flex;gap:10px;align-items:center">
-          {% if g.image_url %}
-            <img src="{{ g.image_url }}" alt="{{ g.name }}" style="width:40px;height:40px;object-fit:cover;border-radius:10px;border:1px solid rgba(255,255,255,.12)">
-          {% endif %}
+          {# V62.1 FIX: same as above — show smart fallback if no upload yet. #}
+          <img src="{{ game_image(g) }}" alt="{{ g.name }}" loading="lazy"
+               style="width:40px;height:40px;object-fit:cover;border-radius:10px;border:1px solid rgba(255,255,255,.12)">
           <b>{{ g.emoji or '🎮' }} {{ g.name }}</b>
           <span class="muted">({{ g.provider }} / {{ g.game_key }})</span>
         </div>
