@@ -10,6 +10,8 @@ import threading
 import secrets
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr, formatdate, make_msgid
 from werkzeug.utils import secure_filename
 
 from functools import wraps
@@ -704,18 +706,36 @@ def email_is_configured():
 email_queue = Queue()
 
 
-def _send_email_sync(to_email, subject, body):
+def _send_email_sync(to_email, subject, body, html_body=None):
     if not email_is_configured():
         app.logger.warning("Email skipped (SMTP not configured): to=%s subject=%s", to_email, subject)
         return
-    msg = MIMEText(body, "plain", "utf-8")
+    # Build multipart message (plain + HTML) to improve deliverability
+    msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = MAIL_FROM
+    msg["From"] = formataddr(("TecnoGems", MAIL_FROM))
     msg["To"] = to_email
+    msg["Reply-To"] = MAIL_FROM
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=MAIL_FROM.split("@")[-1] if "@" in MAIL_FROM else "tecnogems.com")
+    # Anti-spam headers
+    msg["X-Mailer"] = "TecnoGems Mailer"
+    msg["Precedence"] = "bulk"
+    msg["List-Unsubscribe"] = f"<mailto:{MAIL_FROM}?subject=unsubscribe>"
+
+    # Attach plain text first (fallback)
+    part_text = MIMEText(body, "plain", "utf-8")
+    msg.attach(part_text)
+    # Attach HTML if provided
+    if html_body:
+        part_html = MIMEText(html_body, "html", "utf-8")
+        msg.attach(part_html)
     try:
         with smtplib.SMTP(MAIL_SERVER, MAIL_PORT, timeout=30) as server:
+            server.ehlo()
             if MAIL_USE_TLS:
                 server.starttls()
+                server.ehlo()
             server.login(MAIL_USERNAME, MAIL_PASSWORD)
             server.send_message(msg)
     except Exception as exc:
@@ -740,7 +760,7 @@ for _i in range(2):
     threading.Thread(target=_email_worker, daemon=True, name=f"email-worker-{_i}").start()
 
 
-def send_email(to_email, subject, body):
+def send_email(to_email, subject, body, html_body=None):
     """Non-blocking: enqueue email and return immediately.
 
     V45: prefer durable RQ queue when REDIS_URL is configured; fall back to
@@ -755,11 +775,70 @@ def send_email(to_email, subject, body):
                 to_email, subject, body,
                 MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD,
                 MAIL_USE_TLS, MAIL_FROM,
+                html_body=html_body,
             )
             return
     except Exception as exc:
         app.logger.warning("RQ enqueue failed, falling back to thread queue: %s", exc)
-    email_queue.put((to_email, subject, body))
+    email_queue.put((to_email, subject, body, html_body))
+
+
+def _build_email_html(title, greeting, message, button_text, button_url, footer_note):
+    """Build a professional HTML email that passes spam filters.
+
+    Key anti-spam techniques:
+    - Proper HTML structure with DOCTYPE
+    - Inline CSS only (no external stylesheets)
+    - Good text-to-image ratio (no images)
+    - Clear unsubscribe/ignore note
+    - Mobile-responsive design
+    - No spam trigger words in subject handled by callers
+    """
+    return f"""<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{title}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0f172a;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#0f172a;">
+<tr><td align="center" style="padding:40px 20px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;background-color:#1e293b;border-radius:16px;border:1px solid #334155;">
+<!-- Header -->
+<tr><td style="padding:32px 32px 0;text-align:center;">
+  <h1 style="margin:0;font-size:28px;font-weight:800;color:#a78bfa;letter-spacing:-0.5px;">TecnoGems</h1>
+  <p style="margin:8px 0 0;font-size:13px;color:#64748b;">منصة شحن الألعاب</p>
+</td></tr>
+<!-- Body -->
+<tr><td style="padding:32px;">
+  <h2 style="margin:0 0 16px;font-size:20px;color:#f1f5f9;font-weight:700;">{greeting}</h2>
+  <p style="margin:0 0 24px;font-size:15px;line-height:1.7;color:#cbd5e1;">{message}</p>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+  <tr><td align="center">
+    <a href="{button_url}" target="_blank"
+       style="display:inline-block;padding:14px 36px;background-color:#7c3aed;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;border-radius:10px;letter-spacing:0.3px;">
+      {button_text}
+    </a>
+  </td></tr>
+  </table>
+  <p style="margin:24px 0 0;font-size:13px;color:#64748b;line-height:1.6;">
+    إذا لم يعمل الزر، انسخ الرابط التالي والصقه في المتصفح:<br>
+    <a href="{button_url}" style="color:#a78bfa;word-break:break-all;font-size:12px;">{button_url}</a>
+  </p>
+</td></tr>
+<!-- Footer -->
+<tr><td style="padding:0 32px 32px;border-top:1px solid #334155;">
+  <p style="margin:20px 0 0;font-size:12px;color:#475569;line-height:1.6;text-align:center;">
+    {footer_note}<br>
+    <span style="color:#64748b;">&copy; TecnoGems - جميع الحقوق محفوظة</span>
+  </p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
 
 
 def send_verification_email(to_email, token):
@@ -771,7 +850,15 @@ def send_verification_email(to_email, token):
 
 إذا لم تطلب إنشاء حساب، تجاهل هذه الرسالة.
 """
-    send_email(to_email, "تفعيل حسابك في TecnoGems", body)
+    html_body = _build_email_html(
+        title="تفعيل حسابك - TecnoGems",
+        greeting="مرحبًا بك في TecnoGems!",
+        message="شكرًا لإنشاء حسابك. لتفعيل بريدك الإلكتروني والبدء في استخدام المنصة، اضغط على الزر أدناه:",
+        button_text="تفعيل الحساب",
+        button_url=link,
+        footer_note="إذا لم تقم بإنشاء حساب في TecnoGems، يمكنك تجاهل هذه الرسالة بأمان.",
+    )
+    send_email(to_email, "TecnoGems - تفعيل حسابك", body, html_body=html_body)
 
 
 def send_password_reset_email(to_email, token):
@@ -784,7 +871,15 @@ def send_password_reset_email(to_email, token):
 صلاحية الرابط ساعة واحدة فقط.
 إذا لم تطلب استعادة كلمة المرور، تجاهل هذه الرسالة.
 """
-    send_email(to_email, "استعادة كلمة المرور - TecnoGems", body)
+    html_body = _build_email_html(
+        title="استعادة كلمة المرور - TecnoGems",
+        greeting="استعادة كلمة المرور",
+        message="تلقينا طلبًا لإعادة تعيين كلمة المرور الخاصة بحسابك. اضغط على الزر أدناه لإنشاء كلمة مرور جديدة. صلاحية الرابط ساعة واحدة فقط.",
+        button_text="إعادة تعيين كلمة المرور",
+        button_url=link,
+        footer_note="إذا لم تطلب استعادة كلمة المرور، يمكنك تجاهل هذه الرسالة. حسابك آمن.",
+    )
+    send_email(to_email, "TecnoGems - استعادة كلمة المرور", body, html_body=html_body)
 
 
 def send_email_change_confirmation(to_email, token):
@@ -796,7 +891,15 @@ def send_email_change_confirmation(to_email, token):
 
 إذا لم تطلب تغيير البريد، تجاهل هذه الرسالة.
 """
-    send_email(to_email, "تأكيد تغيير البريد - TecnoGems", body)
+    html_body = _build_email_html(
+        title="تأكيد تغيير البريد - TecnoGems",
+        greeting="تأكيد تغيير البريد الإلكتروني",
+        message="تلقينا طلبًا لتغيير البريد الإلكتروني المرتبط بحسابك. اضغط على الزر أدناه لتأكيد التغيير.",
+        button_text="تأكيد تغيير البريد",
+        button_url=link,
+        footer_note="إذا لم تطلب تغيير البريد الإلكتروني، يمكنك تجاهل هذه الرسالة.",
+    )
+    send_email(to_email, "TecnoGems - تأكيد تغيير البريد", body, html_body=html_body)
 
 
 # V53: RQ is the only order queue backend. In-memory fallback removed —
@@ -829,12 +932,14 @@ def smart_game_image_url(game):
         name, key = str(game or ""), ""
     s = (name + " " + key).lower().replace("_", " ")
     mapping = {
+        # --- Original mappings ---
         "8 ball": "8-ball-pool.svg", "afk": "afk-journey.svg", "acecraft": "acecraft.svg",
         "arena breakout": "arena-breakout.svg", "arena of valor": "arena-of-valor.svg",
         "asphalt": "asphalt-9-legends.svg", "black clover": "black-clover-m.svg",
         "blood strike": "blood-strike.svg", "call of duty": "call-of-duty-mobile.svg", "cod": "call-of-duty-mobile.svg",
         "crossfire": "crossfire-mobile.svg", "delta": "delta-force-mobile.svg", "dragon nest": "dragon-nest-m.svg",
-        "fc": "ea-fc-mobile.svg", "fifa": "ea-fc-mobile.svg", "eve": "eve-echoes.svg",
+        "fc": "ea-fc-mobile.svg", "fifa": "ea-fc-mobile.svg", "eafc": "ea-fc-mobile.svg",
+        "eve": "eve-echoes.svg",
         "eggy": "eggy-party.svg", "farlight": "farlight-84.svg", "genshin": "genshin-impact.svg",
         "honkai": "honkai-star-rail.svg", "honor": "honor-of-kings.svg", "mobile legends": "mobile-legends.svg",
         "pubg": "pubg-mobile.svg", "free fire": "free-fire.svg", "freefire": "free-fire.svg",
@@ -845,6 +950,58 @@ def smart_game_image_url(game):
         "etheria": "etheria-restart.svg", "watcher": "watcher-of-realms.svg", "harry potter": "harry-potter-magic-awakened.svg",
         "blockman": "blockman-go.svg", "bleach": "bleach-soul-resonance.svg", "devil may cry": "devil-may-cry.svg",
         "echocalypse": "echocalypse.svg", "frag": "frag-pro-shooter.svg", "heartopia": "heartopia.svg",
+        "mecha break": "mecha-break.svg", "marvel duel": "marvel-duel.svg",
+        # --- New mappings (V62) ---
+        "age of empire": "age-of-empires-mobile.svg", "age of magic": "age-of-magic.svg",
+        "arknights": "arknights-endfield.svg", "arknight": "arknights-endfield.svg",
+        "azur lane": "azur-lane.svg",
+        "bigo": "bigo-live.svg", "bullet echo": "bullet-echo.svg",
+        "cats": "cats-arena.svg", "crash arena": "cats-arena.svg",
+        "civilization": "civilization-mobile.svg", "crossout": "crossout-mobile.svg",
+        "deadly dudes": "deadly-dudes.svg", "destiny": "destiny-rising.svg",
+        "dragon raja": "dragon-raja.svg", "dragonheir": "dragonheir.svg",
+        "duet night": "duet-night-abyss.svg", "dunk city": "dunk-city-dynasty.svg",
+        "enhypen": "enhypen-world.svg", "nikke": "goddess-of-victory-nikke.svg", "gov": "goddess-of-victory-nikke.svg",
+        "undawn": "garena-undawn.svg", "ghost story": "ghost-story.svg",
+        "growtopia": "growtopia.svg", "haikyu": "haikyu-fly-high.svg",
+        "hatsune": "hatsune-miku.svg", "miku": "hatsune-miku.svg",
+        "heaven burns": "heaven-burns-red.svg", "identity v": "identity-v.svg",
+        "kings choice": "kings-choice.svg", "king's choice": "kings-choice.svg",
+        "kingshot": "kingshot.svg", "knives out": "knives-out.svg",
+        "league of legends": "league-of-legends.svg", "lol": "league-of-legends.svg",
+        "legend of the phoenix": "legend-of-phoenix.svg", "legend of phoenix": "legend-of-phoenix.svg",
+        "legends of runeterra": "legends-of-runeterra.svg", "runeterra": "legends-of-runeterra.svg",
+        "life makeover": "life-makeover.svg", "lifeafter": "lifeafter.svg",
+        "likee": "likee.svg", "lineage": "lineage2m.svg",
+        "lord of the rings": "lord-of-rings-war.svg", "lotr": "lord-of-rings-war.svg",
+        "love nikki": "love-nikki.svg", "love and deepspace": "love-and-deepspace.svg",
+        "maplestory": "maplestory-m.svg", "maple story": "maplestory-m.svg",
+        "marvel rivals": "marvel-rivals.svg", "marvel mystic": "marvel-rivals.svg",
+        "metal slug": "metal-slug-awakening.svg", "modern strike": "modern-strike-online.svg",
+        "moonlight blade": "moonlight-blade.svg", "my singing": "my-singing-monsters.svg",
+        "once human": "once-human.svg", "onmyoji": "onmyoji-arena.svg",
+        "overmortal": "overmortal.svg", "oxide": "oxide-survival.svg",
+        "path to nowhere": "path-to-nowhere.svg", "pixel gun": "pixel-gun-3d.svg",
+        "poppo": "poppo-live.svg", "project entropy": "project-entropy.svg",
+        "punishing": "punishing-gray-raven.svg", "gray raven": "punishing-gray-raven.svg",
+        "puzzles": "puzzles-survival.svg", "racing master": "racing-master.svg",
+        "rainbow six": "rainbow-six-mobile.svg", "r6": "rainbow-six-mobile.svg",
+        "rememento": "rememento.svg", "sausage man": "sausage-man.svg",
+        "sea of conquest": "sea-of-conquest.svg", "shining nikki": "shining-nikki.svg",
+        "silver and blood": "silver-and-blood.svg",
+        "sky children": "sky-children-light.svg", "sky: children": "sky-children-light.svg",
+        "snowbreak": "snowbreak.svg", "soul land": "soul-land.svg",
+        "spring valley": "spring-valley.svg", "star resonance": "star-resonance.svg",
+        "starmaker": "starmaker.svg", "state of survival": "state-of-survival.svg",
+        "stormshot": "stormshot.svg", "super sus": "super-sus.svg",
+        "sword of justice": "sword-of-justice.svg", "t3 arena": "t3-arena.svg",
+        "tarisland": "tarisland.svg", "teamfight": "teamfight-tactics.svg", "tft": "teamfight-tactics.svg",
+        "teen patti": "teen-patti-gold.svg", "telegram": "telegram.svg",
+        "the division": "the-division.svg", "division resurgence": "the-division.svg",
+        "tiles survive": "tiles-survive.svg",
+        "where winds": "where-winds-meet.svg", "whiteout": "whiteout-survival.svg",
+        "wuthering": "wuthering-waves.svg", "yalla": "yalla-ludo.svg",
+        "zepeto": "zepeto.svg",
     }
     for needle, filename in mapping.items():
         if needle in s:

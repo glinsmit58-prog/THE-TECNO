@@ -16,6 +16,8 @@ import re
 import smtplib
 import logging
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr, formatdate, make_msgid
 
 log = logging.getLogger("tasks")
 
@@ -75,15 +77,32 @@ def send_email_task(
     smtp_password: str,
     smtp_use_tls: bool,
     mail_from: str,
+    html_body: str = None,
 ):
     """Pure function — safe to enqueue. No app context needed."""
-    msg = MIMEText(body, "plain", "utf-8")
+    # Build multipart message (plain + HTML) for better deliverability
+    msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = mail_from
+    msg["From"] = formataddr(("TecnoGems", mail_from))
     msg["To"] = to_email
+    msg["Reply-To"] = mail_from
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=mail_from.split("@")[-1] if "@" in mail_from else "tecnogems.com")
+    msg["X-Mailer"] = "TecnoGems Mailer"
+    msg["Precedence"] = "bulk"
+    msg["List-Unsubscribe"] = f"<mailto:{mail_from}?subject=unsubscribe>"
+
+    part_text = MIMEText(body, "plain", "utf-8")
+    msg.attach(part_text)
+    if html_body:
+        part_html = MIMEText(html_body, "html", "utf-8")
+        msg.attach(part_html)
+
     with smtplib.SMTP(smtp_server, smtp_port, timeout=30) as server:
+        server.ehlo()
         if smtp_use_tls:
             server.starttls()
+            server.ehlo()
         if smtp_user and smtp_password:
             server.login(smtp_user, smtp_password)
         server.send_message(msg)
