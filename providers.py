@@ -128,7 +128,25 @@ def shop2topup_create_order(item_id: str, player_id: str, quantity: int = 1, exp
         r = requests.post(f"{SHOP2TOPUP_BASE_URL}/orders/create", headers=shop2topup_headers(), json=payload, timeout=45)
         data = r.json()
         if isinstance(data, dict) and data.get("success") is False:
-            return {"error": data.get("message") or str(data), "raw": data}
+            # V68 FIX: shop2topup يرجع الخطأ بصيغة:
+            #   {"success": false, "error": {"code": "...", "message": "..."}}
+            # أو أحيانًا message مباشرة. نستخرج رسالة بشرية واضحة بدل dict خام،
+            # مع ترجمة الأخطاء الشائعة للعربية لتظهر مفهومة في لوحة الإدارة.
+            err_obj = data.get("error")
+            if isinstance(err_obj, dict):
+                code = str(err_obj.get("code") or "").upper()
+                message = err_obj.get("message") or ""
+                _ar_translations = {
+                    "INSUFFICIENT_BALANCE": "رصيد المورد (Shop2Topup) غير كافٍ. يرجى شحن الحساب.",
+                    "INVALID_PLAYER_ID": "معرّف اللاعب غير صحيح لدى المورد.",
+                    "INVALID_SUB_CATEGORY": "الباقة غير متاحة لدى المورد. يلزم إعادة مزامنة الكتالوج.",
+                    "OUT_OF_STOCK": "الباقة غير متوفرة حاليًا لدى المورد.",
+                    "RATE_LIMIT": "تم تجاوز حد الطلبات لدى المورد، أعد المحاولة بعد قليل.",
+                }
+                pretty = _ar_translations.get(code) or message or code or "خطأ من المورد"
+            else:
+                pretty = data.get("message") or err_obj or "خطأ من المورد"
+            return {"error": pretty, "raw": data}
         return data
     except Exception as exc:
         return {"error": str(exc)}
@@ -252,17 +270,54 @@ def validate_player_provider(provider: str, product_id: str, player_id: str) -> 
 # --- Supplier Order Status ---
 
 def _extract_order_id_from_response(provider: str, response: Dict[str, Any]) -> str:
-    """استخراج رقم طلب المورد من الرد بأكثر من شكل محتمل."""
+    """
+    استخراج رقم طلب المورد من الرد بأكثر من شكل محتمل.
+
+    V68 FIX: Shop2Topup يرجع الرد بصيغة:
+        {"success": true, "data": {"order_id": "...", "status": "..."}}
+    أو أحيانًا:
+        {"success": true, "data": {"id": "..."}}
+        {"success": true, "order": {...}}  (شكل قديم)
+    سابقًا كنا نبحث في `response["order"]` و`response["order_id"]` فقط،
+    فيُفقد رقم الطلب لأنه داخل `data` — وآلية المتابعة `refresh_pending_orders`
+    تتخطّاه لاحقًا لأن `provider_order_id` فارغ، فيبقى الطلب عالقًا.
+    """
     if not isinstance(response, dict):
         return ""
 
     if provider == "server1":
-        return str(response.get("order") or response.get("order_id") or response.get("id") or "")
+        # G2Bulk: قد يأتي إما في المستوى الأعلى أو داخل data.
+        oid = response.get("order") or response.get("order_id") or response.get("id")
+        if not oid and isinstance(response.get("data"), dict):
+            d = response["data"]
+            oid = d.get("order") or d.get("order_id") or d.get("id")
+        return str(oid or "")
 
-    order = response.get("order")
-    if isinstance(order, dict):
-        return str(order.get("order_id") or order.get("id") or "")
-    return str(response.get("order_id") or response.get("id") or "")
+    # server2 = Shop2Topup
+    # نجرب كل الأشكال المعروفة بالترتيب الأكثر شيوعًا.
+    for container_key in ("data", "order", "result"):
+        container = response.get(container_key)
+        if isinstance(container, dict):
+            oid = container.get("order_id") or container.get("id") or container.get("orderId")
+            if oid:
+                return str(oid)
+    return str(response.get("order_id") or response.get("id") or response.get("orderId") or "")
+
+
+def _extract_status_from_response(provider: str, response: Dict[str, Any]) -> str:
+    """
+    استخراج حقل status من الرد بأكثر من شكل محتمل.
+    V68 FIX: Shop2Topup يضع الحالة داخل data.status، وكنا نقرأ من response.status فقط.
+    """
+    if not isinstance(response, dict):
+        return ""
+    for container_key in ("data", "order", "result"):
+        container = response.get(container_key)
+        if isinstance(container, dict):
+            s = container.get("status")
+            if s:
+                return str(s).lower()
+    return str(response.get("status") or "").lower()
 
 
 def normalize_supplier_create_status(provider: str, response: Dict[str, Any]) -> Dict[str, Any]:
@@ -283,18 +338,13 @@ def normalize_supplier_create_status(provider: str, response: Dict[str, Any]) ->
         }
 
     provider_order_id = _extract_order_id_from_response(provider, response)
+    status = _extract_status_from_response(provider, response)
 
-    status = ""
-    order = response.get("order")
-    if isinstance(order, dict):
-        status = str(order.get("status") or "").lower()
-    else:
-        status = str(response.get("status") or "").lower()
-
-    if status == "completed":
+    # توحيد المرادفات: completed/complete/done/success كلها مكتمل.
+    if status in ("completed", "complete", "done", "success"):
         return {"ok": True, "status": "completed", "error": "", "provider_order_id": provider_order_id}
 
-    # G2Bulk أحيانًا يرجع order فقط دون حالة؛ هذا يعني أنه تم قبوله لدى المورد وليس مكتملًا مؤكداً
+    # أي حالة أخرى (pending/processing/queued/فارغ) = مقبول لدى المورد بانتظار التنفيذ.
     return {"ok": True, "status": "supplier_pending", "error": status or "Order accepted by supplier", "provider_order_id": provider_order_id}
 
 
@@ -310,8 +360,14 @@ def shop2topup_get_order_status(order_id: str) -> Dict[str, Any]:
     try:
         r = requests.get(f"{SHOP2TOPUP_BASE_URL}/orders/{order_id}", headers=shop2topup_headers(), timeout=30)
         data = r.json()
-        if data.get("success") is False:
-            return {"error": data.get("message") or data.get("error") or str(data), "raw": data}
+        if isinstance(data, dict) and data.get("success") is False:
+            # V68 FIX: نفس منطق rsponse الخطأ في shop2topup_create_order.
+            err_obj = data.get("error")
+            if isinstance(err_obj, dict):
+                pretty = err_obj.get("message") or err_obj.get("code") or "خطأ من المورد"
+            else:
+                pretty = data.get("message") or err_obj or "خطأ من المورد"
+            return {"error": pretty, "raw": data}
         return data
     except Exception as exc:
         return {"error": str(exc)}
@@ -328,6 +384,7 @@ def get_provider_order_status(provider: str, provider_order_id: str) -> Dict[str
 def normalize_supplier_status(provider: str, response: Dict[str, Any]) -> Dict[str, Any]:
     """
     تحويل رد المورد إلى حالة داخلية موحدة.
+    V68 FIX: يقرأ status من data.status أيضًا (شكل Shop2Topup الحالي).
     """
     if not isinstance(response, dict):
         return {"status": "supplier_pending", "note": "Invalid status response"}
@@ -335,15 +392,11 @@ def normalize_supplier_status(provider: str, response: Dict[str, Any]) -> Dict[s
     if response.get("error"):
         return {"status": "supplier_pending", "note": response.get("error")}
 
-    # Shop2Topup: {"success":true,"order":{"status":"completed"...}}
-    order = response.get("order")
-    if isinstance(order, dict):
-        status = str(order.get("status") or "").lower()
-    else:
-        status = str(response.get("status") or "").lower()
+    # يدعم: response.status / response.order.status / response.data.status / response.result.status
+    status = _extract_status_from_response(provider, response)
 
     # G2Bulk/SMM غالباً: Pending, In progress, Completed, Canceled, Partial
-    s = status.replace("_", " ").strip().lower()
+    s = (status or "").replace("_", " ").strip().lower()
 
     if s in ("completed", "complete", "done", "success"):
         return {"status": "completed", "note": "Supplier completed"}
