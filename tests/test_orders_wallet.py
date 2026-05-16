@@ -120,7 +120,9 @@ class TestWalletDeposit:
         assert resp.status_code in (302, 303)
         assert len(app._test_database.list_deposits_for_user(user["id"])) == 0
 
-    def test_deposit_requires_proof(self, app, client, make_user, login_as):
+    def test_deposit_proof_optional(self, app, client, make_user, login_as):
+        # V67.3: الإيصال أصبح اختياريًا. عند تركه فارغًا يجب إنشاء الإيداع
+        # مع نص افتراضي يوضّح أنه سيُراجع يدويًا من الإدارة.
         user = make_user(email="w3@test.local")
         login_as(user["id"])
         resp = client.post(
@@ -129,7 +131,9 @@ class TestWalletDeposit:
             follow_redirects=False,
         )
         assert resp.status_code in (302, 303)
-        assert len(app._test_database.list_deposits_for_user(user["id"])) == 0
+        deposits = app._test_database.list_deposits_for_user(user["id"])
+        assert len(deposits) == 1
+        assert "بدون إيصال" in (deposits[0]["proof"] or "")
 
     def test_deposit_requires_valid_method(self, app, client, make_user, login_as):
         user = make_user(email="w4@test.local")
