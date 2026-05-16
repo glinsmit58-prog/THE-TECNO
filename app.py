@@ -62,6 +62,9 @@ def set_setting(key, value):
     return _db_set_setting(key, value)
 
 from providers import create_provider_order, get_provider_balance, validate_player_provider
+# V71: للـ in-process cache الخاص بـ /api/validate-player.
+import threading as _vp_threading
+import time as _vp_time
 from sanitize import clean_plain_text, clean_rich_text
 
 load_dotenv()
@@ -2147,7 +2150,87 @@ def admin_update_manual_syp_prices(provider, game_key):
 @login_required
 @(limiter.limit("30 per minute") if limiter else (lambda f: f))
 def api_validate_player():
-    return {"enabled": False, "success": False}
+    """
+    V71: التحقق من اسم اللاعب لدى المورد قبل إنشاء الطلب.
+
+    سلوك آمن ومحدود:
+    - يحتاج تسجيل دخول (`@login_required`).
+    - Rate-limit 30/دقيقة لكل IP (مطبّق فعلاً عبر الـ decorator).
+    - مفعّل/معطّل عبر إعداد admin: `player_validation_api_enabled`.
+    - Cache داخلي (process-local) لكل (provider, product_id, player_id):
+        نتيجة المورد تُحفظ ٦٠ ثانية فقط. يمنع enumeration والـ DDoS
+        الذي يكلّفنا استدعاءات للمورد.
+    - يقبل JSON: { product_id: int, player_id: str }.
+    - يرجع JSON موحّد بنفس شكل validate_player_provider.
+
+    ملاحظة: هذا المسار يُكشف نتيجة "ID صحيح أم لا" — وهو مقبول هنا لأنه
+    يحاكي بالضبط ما تفعله المواقع المنافسة، لكن نضيف rate-limit + cache
+    للحدّ من الإساءة.
+    """
+    user = current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "يجب تسجيل الدخول"}), 401
+
+    if get_setting("player_validation_api_enabled", "0") != "1":
+        return jsonify({
+            "ok": True,
+            "enabled": False,
+            "success": False,
+            "error": "خاصية التحقق من اسم اللاعب غير مفعّلة حاليًا",
+        })
+
+    data = request.get_json(silent=True) or {}
+    try:
+        product_id = int(data.get("product_id"))
+    except Exception:
+        return jsonify({"ok": False, "error": "الباقة غير صحيحة"}), 400
+
+    player_id = (data.get("player_id") or "").strip()
+    if len(player_id) < 3 or len(player_id) > MAX_PLAYER_ID_LEN:
+        return jsonify({"ok": False, "error": "معرف اللاعب غير صحيح"}), 400
+
+    product = get_product(product_id)
+    if not product:
+        return jsonify({"ok": False, "error": "الباقة غير موجودة"}), 404
+
+    cache_key = (product["provider"], str(product["provider_product_id"]), player_id)
+    now = _vp_time.time()
+    with _VP_CACHE_LOCK:
+        cached = _VP_CACHE.get(cache_key)
+        if cached and (now - cached[0]) < _VP_CACHE_TTL:
+            return jsonify({"ok": True, "enabled": True, **cached[1]})
+
+    result = validate_player_provider(
+        product["provider"],
+        product["provider_product_id"],
+        player_id,
+    )
+    # ننظّف من حقل raw قبل الإرجاع للعميل: قد يحوي تفاصيل المورد التي
+    # لا حاجة للعميل بها (وسبق وتسبّبت في تسريبات في v50).
+    safe = {
+        "success": bool(result.get("success")),
+        "player_name": str(result.get("player_name") or ""),
+        "verified_only": bool(result.get("verified_only")),
+        "unsupported": bool(result.get("unsupported")),
+    }
+    if not safe["success"]:
+        safe["error"] = str(result.get("error") or "تعذر التحقق من اللاعب")
+
+    with _VP_CACHE_LOCK:
+        # حدّ بسيط لحجم الـ cache كي لا ينمو بلا نهاية.
+        if len(_VP_CACHE) >= 2000:
+            _VP_CACHE.clear()
+        _VP_CACHE[cache_key] = (now, safe)
+
+    return jsonify({"ok": True, "enabled": True, **safe})
+
+
+# V71: cache process-local لتقليل ضغط الاستعلامات على المورد. نحدّ ب-60 ثانية
+# لكل (provider, product_id, player_id). المفتاح يستبعد user_id حتى لو طلب
+# عدة مستخدمين نفس اللاعب نقتصر على استعلام واحد للمورد.
+_VP_CACHE: dict = {}
+_VP_CACHE_LOCK = _vp_threading.Lock()
+_VP_CACHE_TTL = 60.0
 
 
 
@@ -3308,6 +3391,8 @@ def admin_settings():
         # old_games_layout setting removed in V44.2 (single neon layout only)
         set_setting("manual_price_edit_enabled", "1" if request.form.get("manual_price_edit_enabled") else "0")
         set_setting("auto_refund_on_failure", "1" if request.form.get("auto_refund_on_failure") else "0")
+        # V71: تفعيل/إيقاف نقطة API للتحقق من اسم اللاعب لدى المورد.
+        set_setting("player_validation_api_enabled", "1" if request.form.get("player_validation_api_enabled") else "0")
         # V66: homepage section toggles + editable testimonial copy.
         set_setting("show_popular_bar", "1" if request.form.get("show_popular_bar") else "0")
         set_setting("show_testimonials", "1" if request.form.get("show_testimonials") else "0")
@@ -3353,6 +3438,8 @@ def admin_settings():
         show_groups_direct_setting=get_setting("show_groups_direct", "0"),
         old_games_layout_setting=get_setting("old_games_layout", "0"),
         auto_refund_on_failure_setting=get_setting("auto_refund_on_failure", "0"),
+        # V71 — توگل خاصية التحقق من اسم اللاعب عبر API.
+        player_validation_api_enabled_setting=get_setting("player_validation_api_enabled", "0"),
         # V66: homepage section toggles + editable testimonial copy.
         show_popular_bar_setting=get_setting("show_popular_bar", "1"),
         show_testimonials_setting=get_setting("show_testimonials", "1"),
