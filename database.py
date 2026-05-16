@@ -1231,11 +1231,25 @@ def update_order(order_id, status, provider_order_id=None, note=None):
                 conn.rollback()
                 return False
 
+            # V69.1: حماية من الانتقالات غير الآمنة. سابقاً كان يمكن نقل
+            # طلب completed → rejected وهذا يُعيد المبلغ للمستخدم رغم أن
+            # المنتج سُلِّم له (استرداد مزدوج). القاعدة:
+            #   - completed و rejected حالات نهائية لا يُسمح بالخروج منها
+            #     إلى حالة مختلفة (إعادة فتح طلب نهائي يجب أن تتم يدوياً
+            #     في SQL مع تدقيق ومراجعة محاسبية).
+            #   - يُسمح بـ no-op (نفس الحالة) لأن tasks.py قد تستدعينا
+            #     لتحديث note فقط، والحماية من ازدواج الاسترداد محفوظة
+            #     بالشرط `old_status != 'rejected'` أدناه.
+            old_status = old_order["status"]
+            if old_status in ("completed", "rejected") and old_status != status:
+                conn.rollback()
+                return False
+
             cur.execute("UPDATE orders SET status=?, provider_order_id=?, note=?, updated_at=? WHERE id=?",
                         (status, provider_order_id, note, int(time.time()), order_id))
 
             # إرجاع الرصيد فقط إذا كانت الحالة السابقة ليست مرفوضة والحالة الجديدة مرفوضة
-            if status == "rejected" and old_order["status"] != "rejected":
+            if status == "rejected" and old_status != "rejected":
                 cur.execute("UPDATE users SET balance = balance + ? WHERE id=?",
                             (old_order["price"], old_order["user_id"]))
             conn.commit()
@@ -1395,6 +1409,39 @@ def create_deposit(user_id, amount, method_id, proof, amount_usd=None, proof_fil
     if not method:
         return None
     currency = method.get("currency", "USD")
+    # V69: server-side dedup. Prevents the "double-click / lost-network /
+    # back-button-resubmit" pattern where the same user creates two
+    # identical pending deposits within seconds, which then both have to
+    # be reviewed and (worse) approved by the admin team.
+    # Window: 60 seconds. Two pending deposits with the same user, method,
+    # and amount inside that window are treated as the same submission and
+    # the existing deposit's id/code are returned (idempotent reply, so the
+    # caller still flashes "تم استلام طلب الشحن" once).
+    try:
+        _amount_check = float(amount or 0)
+    except Exception:
+        _amount_check = 0.0
+    if _amount_check > 0:
+        with db_conn() as conn:
+            row = conn.execute(
+                """
+                SELECT id, deposit_code FROM deposits
+                WHERE user_id=?
+                  AND method=?
+                  AND status='pending'
+                  AND ABS(amount - ?) < 0.005
+                  AND created_at >= ?
+                ORDER BY id DESC LIMIT 1
+                """,
+                (
+                    int(user_id),
+                    method["name"],
+                    _amount_check,
+                    int(time.time()) - 60,
+                ),
+            ).fetchone()
+            if row:
+                return row["id"], row["deposit_code"]
     # V49-HOTFIX (defense in depth): always recompute amount_usd server-side
     # from the amount + method currency + current rate, regardless of what the
     # caller passed. This guarantees that:
