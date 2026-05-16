@@ -1986,8 +1986,15 @@ def checkout(product_id):
             f'لمتابعة حالة طلبك <a href="{track_url}" class="alert-link"><strong>اضغط هنا</strong></a>.'
         ), "success")
         return redirect(url_for("orders"))
-    return render_template("checkout.html", product=product, game=game, show_server1=get_setting("show_server1", "1"),
-        show_server2=get_setting("show_server2", "1"))
+    return render_template(
+        "checkout.html",
+        product=product,
+        game=game,
+        show_server1=get_setting("show_server1", "1"),
+        show_server2=get_setting("show_server2", "1"),
+        # V71: نمرّر حالة الإعداد للقالب حتى يقرّر إظهار/إخفاء زر "تحقق من الاسم"
+        player_validation_enabled=(get_setting("player_validation_api_enabled", "0") == "1"),
+    )
 
 
 
