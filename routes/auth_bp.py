@@ -51,6 +51,7 @@ from app import (
     authenticate,
     create_user,
     email_verification_is_enabled,
+    get_real_ip,
     get_setting,
     get_user_by_email,
     get_user_by_id,
@@ -288,7 +289,7 @@ def login():
         # to prevent CPU-DoS via huge passwords.
         if len(password) > MAX_PASSWORD_LEN or len(email) > MAX_EMAIL_LEN:
             log.warning(
-                "Rejected oversized login inputs from %s", request.remote_addr
+                "Rejected oversized login inputs from %s", get_real_ip()
             )
             flash("بيانات الدخول غير صحيحة", "danger")
             return render_template(
@@ -338,7 +339,7 @@ def login():
         log.warning(
             "Failed login attempt for email=%s from ip=%s",
             email,
-            request.remote_addr,
+            get_real_ip(),
         )
         flash("بيانات الدخول غير صحيحة", "danger")
         return render_template(
@@ -373,7 +374,7 @@ def logout():
     if request.method == "GET":
         log.info(
             "logout via GET from ip=%s user_id=%s — consider moving to POST form",
-            request.remote_addr,
+            get_real_ip(),
             session.get("user_id"),
         )
     session.clear()
