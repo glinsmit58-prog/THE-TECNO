@@ -3032,11 +3032,11 @@ def setup_once():
 @admin_required
 def admin_games():
     if request.method == "POST":
-        # V68: حفظ خيارات إيقاف السيرفرات (تخفي كل ألعاب السيرفر من الواجهة).
-        # نقبل الحقول الجديدة (server1_enabled / server2_enabled) ونبقى متوافقين
-        # مع الإعدادين القديمين في صفحة الإعدادات (show_server1 / show_server2).
-        set_setting("show_server1", "1" if request.form.get("server1_enabled") else "0")
-        set_setting("show_server2", "1" if request.form.get("server2_enabled") else "0")
+        # V68/V72: حفظ تفعيل/إيقاف السيرفرات. صفحة /admin/games هي المالك
+        # الوحيد لإعدادي show_server1 و show_server2 (تمت إزالتهما من
+        # /admin/settings لتوحيد المصدر وتجنّب التعارض بين نموذجين).
+        set_setting("show_server1", "1" if request.form.get("show_server1") else "0")
+        set_setting("show_server2", "1" if request.form.get("show_server2") else "0")
 
         # V55: حفظ حقلين — الألعاب المفعّلة والألعاب التي تظهر في الرئيسية.
         active_keys = set(request.form.getlist("active_game"))
@@ -3485,8 +3485,8 @@ def admin_settings():
         set_setting("usd_syp_rate", request.form.get("usd_syp_rate", "15000").strip())
         set_setting("pricing_mode", request.form.get("pricing_mode", "usd"))
         set_setting("manual_orders", "1" if request.form.get("manual_orders") else "0")
-        set_setting("show_server1", "1" if request.form.get("show_server1") else "0")
-        set_setting("show_server2", "1" if request.form.get("show_server2") else "0")
+        # V72: show_server1 / show_server2 يُداران من /admin/games فقط لتجنّب
+        # التعارض بين نموذجين (كان نفس المفتاح يُحفظ من مكانين بأسماء مختلفة).
         # V67.1: primary provider — used by admin filters & badges so the
         # operator can clearly tell which orders/games are on which supplier.
         _pp = (request.form.get("primary_provider") or "server2").strip()
@@ -3535,8 +3535,6 @@ def admin_settings():
         whatsapp_number_setting=get_setting("whatsapp_number", ""),
         telegram_username_setting=get_setting("telegram_username", ""),
         manual_orders=get_setting("manual_orders", "0"),
-        show_server1=get_setting("show_server1", "1"),
-        show_server2=get_setting("show_server2", "1"),
         # V67.1 — primary provider for admin UI separation (badges, filters).
         primary_provider_setting=get_setting("primary_provider", "server2"),
         email_verification_enabled=get_setting("email_verification_enabled", "0"),

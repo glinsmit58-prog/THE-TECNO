@@ -120,15 +120,13 @@
       </option>
     </select>
 
-    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px">
-      <label style="display:flex;gap:8px;align-items:center">
-        <input type="checkbox" name="show_server1" value="1" {% if show_server1=="1" %}checked{% endif %} style="width:auto">
-        تفعيل المورد 1 (G2Bulk)
-      </label>
-      <label style="display:flex;gap:8px;align-items:center">
-        <input type="checkbox" name="show_server2" value="1" {% if show_server2=="1" %}checked{% endif %} style="width:auto">
-        تفعيل المورد 2 (Shop2Topup)
-      </label>
+    {# V72: تفعيل/إيقاف المورد 1 و المورد 2 (show_server1 / show_server2) أصبحا
+       يُداران من صفحة "الألعاب المعروضة في الواجهة" حصراً، حتى لا يحصل
+       تعارض بين النموذجين (نفس المفتاح كان يُحفظ من مكانين بأسماء مختلفة). #}
+    <div class="alert" style="margin-top:14px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.25);border-radius:10px;padding:10px 14px;font-size:13px">
+      تفعيل/إيقاف <b>المورد 1</b> و <b>المورد 2</b> أصبح يُدار من
+      <a href="{{ url_for('admin_games') }}"><b>صفحة الألعاب</b></a>
+      (في أعلى كل عمود سيرفر يوجد زر "السيرفر مُفعَّل / مُوقَف").
     </div>
 
     <label style="display:flex;gap:10px;align-items:center">
