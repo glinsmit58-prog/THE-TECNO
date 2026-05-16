@@ -1,5 +1,29 @@
 {% extends "base.html" %}
 {% block content %}
+{# V69: شعار النجاح بعد إرسال طلب الشحن.
+   كان سابقًا يُرسَل عبر flash() — وهذا تسبّب في أن يظل الإشعار يظهر
+   مع كل تحديث للصفحة (F5) بسبب bfcache + StaleWhileRevalidate في
+   service worker. الآن نمرّره عبر query string `?deposit_ok=<code>`،
+   ونمسحه من شريط العنوان عبر history.replaceState فور عرض الـ toast
+   (انظر السكريبت أسفل الصفحة)، فلا يبقى أثر له بعد أول refresh. #}
+{% if deposit_ok %}
+<div class="messages" id="tg-deposit-success-wrap">
+  <div class="alert success">
+    <div class="tg-deposit-toast">
+      <span class="tg-deposit-toast__icon" aria-hidden="true">✓</span>
+      <div class="tg-deposit-toast__body">
+        <div class="tg-deposit-toast__title">
+          تم استلام طلب الشحن رقم <strong>{{ deposit_ok }}</strong> بنجاح
+        </div>
+        <div class="tg-deposit-toast__desc">
+          طلبك الآن قيد المراجعة من قبل الإدارة، وسيُضاف الرصيد إلى محفظتك فور الموافقة.
+          <a href="{{ url_for('wallet_transactions') }}" class="tg-deposit-toast__link">متابعة حالة الطلب</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 <section style="padding:34px 0">
   <div class="grid two">
     <div class="card">
@@ -67,5 +91,19 @@ function updatePaymentInfo(){
 }
 document.addEventListener('DOMContentLoaded', updatePaymentInfo);
 document.addEventListener('change', (e)=>{ if(e.target && e.target.id==='payment-method') updatePaymentInfo(); });
+
+// V69: إزالة معامل deposit_ok من الـ URL فور عرض الإشعار، حتى لا
+// يعود للظهور عند تحديث الصفحة. (replaceState لا يُعيد تحميل
+// الصفحة ولا يُضيف إلى تاريخ التصفح.)
+(function(){
+  try {
+    var url = new URL(window.location.href);
+    if (url.searchParams.has('deposit_ok')) {
+      url.searchParams.delete('deposit_ok');
+      var clean = url.pathname + (url.search ? url.search : '') + url.hash;
+      window.history.replaceState({}, document.title, clean);
+    }
+  } catch (e) { /* المتصفحات القديمة: تجاهل */ }
+})();
 </script>
 {% endblock %}
