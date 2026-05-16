@@ -37,7 +37,7 @@
           <span class="muted small">({{ server1_games|length }} لعبة)</span>
         </div>
         <label class="server-toggle" title="عند إيقاف السيرفر تختفي كل ألعابه من الواجهة الرئيسية">
-          <input type="checkbox" name="server1_enabled" value="1" class="js-server-toggle"
+          <input type="checkbox" name="show_server1" value="1" class="js-server-toggle"
                  data-target="server1" {% if server1_enabled %}checked{% endif %}>
           <span class="server-toggle-label">
             <b class="on-label">السيرفر مُفعَّل</b>
@@ -95,7 +95,7 @@
           <span class="muted small">({{ server2_games|length }} لعبة)</span>
         </div>
         <label class="server-toggle" title="عند إيقاف السيرفر تختفي كل ألعابه من الواجهة الرئيسية">
-          <input type="checkbox" name="server2_enabled" value="1" class="js-server-toggle"
+          <input type="checkbox" name="show_server2" value="1" class="js-server-toggle"
                  data-target="server2" {% if server2_enabled %}checked{% endif %}>
           <span class="server-toggle-label">
             <b class="on-label">السيرفر مُفعَّل</b>
