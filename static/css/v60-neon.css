@@ -2349,3 +2349,69 @@ label {
 .admin-game-row.row-flash {
   animation: rowFlash 0.4s ease-out;
 }
+
+
+
+/* ─────────────────────────────────────────────────────────────────────
+   V67.3 — بطاقة تأكيد طلب شحن المحفظة (deposit toast)
+   تُستخدم داخل .alert.success كرسالة موحّدة، مرتّبة، وبأسلوب نيون.
+   ───────────────────────────────────────────────────────────────────── */
+.messages .alert .tg-deposit-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+}
+.tg-deposit-toast__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.25), rgba(124, 58, 237, 0.25));
+  border: 1px solid rgba(34, 211, 238, 0.55);
+  color: #5eefc2;
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1;
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.25);
+}
+.tg-deposit-toast__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tg-deposit-toast__title {
+  font-weight: 700;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  margin-bottom: 0.25rem;
+  color: var(--fg, #f1f1ff);
+}
+.tg-deposit-toast__title strong {
+  color: var(--neon, #22d3ee);
+  font-weight: 800;
+}
+.tg-deposit-toast__desc {
+  font-size: 0.86rem;
+  line-height: 1.6;
+  opacity: 0.92;
+}
+.tg-deposit-toast__link {
+  display: inline-block;
+  margin-inline-start: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(34, 211, 238, 0.12);
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  color: #5eefc2;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.82rem;
+  transition: background-color .15s ease, transform .15s ease;
+}
+.tg-deposit-toast__link:hover {
+  background: rgba(34, 211, 238, 0.22);
+  transform: translateY(-1px);
+}

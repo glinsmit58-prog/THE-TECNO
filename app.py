@@ -2068,9 +2068,14 @@ def wallet():
         if not method:
             flash("طريقة الدفع غير صحيحة", "danger")
             return redirect(url_for("wallet"))
-        if len(proof) < 3:
-            flash("أرسل إثبات الدفع أو ارفع صورة الإيصال", "danger")
-            return redirect(url_for("wallet"))
+        # V67.3: الإيصال أصبح اختياريًا. الإدارة تراجع الطلبات يدويًا داخل
+        # المركز ولا تحتاج إلى إيصال إجباري لكل طلب. السلوك السابق كان
+        # يطلب إيصالًا في بعض الطلبات ويتجاوزه في طلبات أخرى (لأن الـ
+        # التحقق كان مبنيًا على طول النص فقط)، وهو ما تسبب في إرباك
+        # المستخدم. لم نعد نرفض الطلب إذا كان الإيصال فارغًا — نخزّن
+        # نصًا افتراضيًا حتى لا تُكسر القيود في قاعدة البيانات.
+        if not proof:
+            proof = "(بدون إيصال — سيتم التحقق يدويًا من الإدارة)"
 
         rate = float(get_setting("usd_syp_rate", "15000") or 15000)
         if method.get("currency") == "SYP":
@@ -2088,20 +2093,19 @@ def wallet():
         dep = create_deposit(user["id"], amount, method_id, proof, amount_usd=amount_usd,
                              proof_filename=proof_filename_saved)
         if dep:
-            # V67.2: friendlier, more reassuring confirmation. We tell the
-            # user explicitly that the request was *received*, that it is
-            # *under review*, and give a clear CTA to track its status.
+            # V67.3: رسالة تأكيد نظيفة — مبنية على كلاس CSS واحد بدلاً من
+            # inline-styles مبعثرة. تمرّر بنية HTML بسيطة، وكلاس
+            # `tg-deposit-toast` هو من يتولى التنسيق (ألوان، حشو، أيقونة،
+            # خط، تباعد). انظر static/css/v60-neon.css.
             track_url = url_for("wallet_transactions")
             flash(Markup(
-                '<div style="display:flex;align-items:flex-start;gap:10px">'
-                '<span style="font-size:20px;line-height:1.2">✅</span>'
-                '<div>'
-                f'<strong>تم استلام طلب الشحن رقم {dep[1]} بنجاح.</strong> '
-                'طلبك الآن <strong>قيد المراجعة</strong> من قبل الإدارة، '
-                'وسيُضاف الرصيد إلى محفظتك فور الموافقة.'
-                '<div style="margin-top:6px;font-size:13px;opacity:.95">'
-                '🔎 لمتابعة حالة طلبك '
-                f'<a href="{track_url}" class="alert-link"><strong>اضغط هنا</strong></a>.'
+                '<div class="tg-deposit-toast" data-once="1">'
+                '<span class="tg-deposit-toast__icon" aria-hidden="true">✓</span>'
+                '<div class="tg-deposit-toast__body">'
+                f'<div class="tg-deposit-toast__title">تم استلام طلب الشحن رقم <strong>{dep[1]}</strong> بنجاح</div>'
+                '<div class="tg-deposit-toast__desc">'
+                'طلبك الآن قيد المراجعة من قبل الإدارة، وسيُضاف الرصيد إلى محفظتك فور الموافقة. '
+                f'<a href="{track_url}" class="tg-deposit-toast__link">متابعة حالة الطلب</a>'
                 '</div>'
                 '</div>'
                 '</div>'

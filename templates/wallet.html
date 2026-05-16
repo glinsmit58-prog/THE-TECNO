@@ -37,11 +37,14 @@
           <div id="method-instructions" class="muted" style="white-space:pre-wrap"></div>
         </div>
 
-        <label>رقم العملية أو ملاحظة</label>
-        <textarea name="proof" rows="3" maxlength="2000" placeholder="ضع رقم العملية أو أي تفاصيل تثبت الدفع"></textarea>
+        <label>رقم العملية أو ملاحظة <span class="muted">(اختياري)</span></label>
+        <textarea name="proof" rows="3" maxlength="2000" placeholder="ضع رقم العملية أو أي تفاصيل تثبت الدفع — اختياري"></textarea>
 
-        <label>رفع صورة الإيصال</label>
+        <label>رفع صورة الإيصال <span class="muted">(اختياري)</span></label>
         <input class="file-input" type="file" name="proof_image" accept="image/*">
+        <p class="muted" style="margin:6px 0 0;font-size:13px">
+          الإيصال غير مطلوب — تتم مراجعة الطلبات يدويًا من الإدارة.
+        </p>
 
         <button class="btn primary" type="submit" style="margin-top:18px;width:100%">{{ t("submit_deposit") }}</button>
       </form>
