@@ -310,7 +310,13 @@ def login():
                 and int(user.get("totp_enabled") or 0) == 1
             ):
                 session["admin_2fa_verified"] = False
-            flash("تم تسجيل الدخول بنجاح", "success")
+            # V67.1: removed the standalone "تم تسجيل الدخول بنجاح" flash.
+            # The flash session entry was lingering and showing up on the
+            # next page load (e.g. after submitting a top-up request), so
+            # the user saw "تم تسجيل الدخول بنجاح" instead of the actual
+            # confirmation we wanted them to see. The navbar already shows
+            # the user is logged in (balance pill, profile icon, logout),
+            # so the flash is redundant.
             return redirect(safe_next_url("home"))
         # V50 SECURITY (M10): log failed auth attempts for monitoring / fail2ban.
         log.warning(
@@ -410,5 +416,6 @@ def auth_google_callback():
     session.clear()
     session["user_id"] = user["id"]
     session.permanent = True
-    flash("تم تسجيل الدخول عبر Google", "success")
+    # V67.1: same as the password-login path — drop the noisy flash so it
+    # cannot leak onto a later page (deposit-submitted screen, checkout, etc).
     return redirect(safe_next_url("home"))

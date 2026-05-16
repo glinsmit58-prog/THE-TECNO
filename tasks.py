@@ -160,16 +160,26 @@ def process_order(order_id: int):
 
         update_order(order_id, "processing", None, "Sending order to supplier")
 
+        # V67.1: log every supplier call so we can see WHY orders fall to
+        # manual_pending. Previous version swallowed the response into an
+        # opaque note that admins could not interpret.
+        log.info(
+            "process_order %s: provider=%s product_id=%s player_id=%s",
+            order_id, product.get("provider"),
+            product.get("provider_product_id"), order.get("player_id"),
+        )
         res = create_provider_order(
             product["provider"],
             product["provider_product_id"],   # ← critical: external supplier id
             order["player_id"],
         )
+        log.info("process_order %s: supplier response keys=%s",
+                 order_id, list(res.keys()) if isinstance(res, dict) else type(res).__name__)
 
         auto_refund = get_setting("auto_refund_on_failure", "0") == "1"
 
         if not isinstance(res, dict):
-            note = "Invalid response from supplier"
+            note = f"Invalid response from supplier ({type(res).__name__})"
             status = "rejected" if auto_refund else "manual_pending"
             update_order(order_id, status, None, f"{note}{' (auto-refund)' if auto_refund else ''}")
             log.error("Order %s: invalid supplier response: %r", order_id, res)

@@ -2,15 +2,37 @@
 {% block content %}
 <section style="padding:34px 0">
   <h1>إدارة الطلبات</h1>
-  <div class="links" style="margin-bottom:16px">
-    <a class="btn" href="{{ url_for('admin_orders') }}">الكل</a>
-    <a class="btn" href="{{ url_for('admin_orders', status='waiting') }}">بانتظار التنفيذ</a>
-    <a class="btn" href="{{ url_for('admin_orders', status='processing') }}">جاري التنفيذ</a>
-    <a class="btn" href="{{ url_for('admin_orders', status='supplier_pending') }}">جاري التنفيذ</a>
-    <a class="btn" href="{{ url_for('admin_orders', status='manual_pending') }}">تنفيذ يدوي</a>
-    <a class="btn" href="{{ url_for('admin_orders', status='pending') }}">معلقة</a>
-    <a class="btn" href="{{ url_for('admin_orders', status='completed') }}">مكتملة</a>
+
+  {# V67.1: provider separator. Defaults to the configured primary
+     provider so the operator's main supplier opens first. #}
+  {% set ap = active_provider or primary_provider %}
+  <div class="provider-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+    <a class="provider-tab {% if ap=='server2' %}is-active{% endif %}"
+       href="{{ url_for('admin_orders', status=status, provider='server2') }}">
+      🟢 Shop2Topup
+      {% if primary_provider=='server2' %}<span class="provider-tab-pill">الأساسي</span>{% endif %}
+    </a>
+    <a class="provider-tab {% if ap=='server1' %}is-active{% endif %}"
+       href="{{ url_for('admin_orders', status=status, provider='server1') }}">
+      🔵 G2Bulk
+      {% if primary_provider=='server1' %}<span class="provider-tab-pill">الأساسي</span>{% endif %}
+    </a>
+    <a class="provider-tab {% if ap=='all' %}is-active{% endif %}"
+       href="{{ url_for('admin_orders', status=status, provider='all') }}">
+      الكل
+    </a>
   </div>
+
+  <div class="links" style="margin-bottom:16px">
+    <a class="btn" href="{{ url_for('admin_orders', provider=ap) }}">جميع الحالات</a>
+    <a class="btn" href="{{ url_for('admin_orders', status='waiting', provider=ap) }}">بانتظار التنفيذ</a>
+    <a class="btn" href="{{ url_for('admin_orders', status='processing', provider=ap) }}">جاري التنفيذ</a>
+    <a class="btn" href="{{ url_for('admin_orders', status='supplier_pending', provider=ap) }}">عند المورد</a>
+    <a class="btn" href="{{ url_for('admin_orders', status='manual_pending', provider=ap) }}">تنفيذ يدوي</a>
+    <a class="btn" href="{{ url_for('admin_orders', status='completed', provider=ap) }}">مكتملة</a>
+    <a class="btn" href="{{ url_for('admin_orders', status='rejected', provider=ap) }}">مرفوضة</a>
+  </div>
+
   {# V67: manual sweep — asks each supplier for the latest status of every
      pending order. Use this to immediately unstick "جاري التنفيذ" rows
      instead of waiting for the periodic poller. #}
@@ -21,44 +43,71 @@
       يفحص الطلبات قيد التنفيذ ويسحب أحدث حالة من المورد.
     </span>
   </form>
+
   <div class="table-wrap">
     <table>
       <thead><tr><th>الطلب</th><th>المستخدم</th><th>السيرفر</th><th>اللعبة</th><th>الباقة</th><th>Player ID</th><th>السعر</th><th>التاريخ / سوريا</th><th>الحالة</th><th>إجراء</th></tr></thead>
       <tbody>
       {% for o in orders %}
         <tr data-order-id="{{ o.id }}">
-          <td>{{ o.order_code }}</td>
+          <td>
+            <code>{{ o.order_code }}</code>
+            {% if o.provider_order_id %}
+              <div class="muted" style="font-size:11px">رقم المورد: {{ o.provider_order_id }}</div>
+            {% endif %}
+          </td>
           <td>#{{ o.user_id }}</td>
-          <td>{{ "سيرفر 1" if o.provider=="server1" else "سيرفر 2" }}</td>
+          <td>
+            {% if o.provider == 'server2' %}
+              <span class="provider-badge provider-server2">🟢 Shop2Topup</span>
+            {% elif o.provider == 'server1' %}
+              <span class="provider-badge provider-server1">🔵 G2Bulk</span>
+            {% else %}
+              <span class="provider-badge">{{ o.provider }}</span>
+            {% endif %}
+          </td>
           <td>{{ o.game_name or o.game_key }}</td>
-          <td>{{ (o.game_name or o.game_key) }} - {{ o.product_name|public_package_name }}</td>
+          <td>{{ o.product_name|public_package_name }}</td>
           <td><code>{{ o.player_id }}</code></td>
           <td>{{ wallet_money(o.price) }}</td>
           <td>{{ o.created_at|syria_time }}</td>
           <td>
-  {% if o.status == 'waiting' %}
-    <span class="status waiting">بانتظار التنفيذ</span>
-  {% elif o.status == 'manual_pending' %}
-    <span class="status pending">تنفيذ يدوي</span>
-    {% if o.note %}<div class="muted" style="max-width:260px;white-space:normal">السبب: {{ o.note }}</div>{% endif %}
-    {% elif o.status == 'processing' %}
-    <span class="status processing">جاري التنفيذ</span>
-  {% elif o.status == 'supplier_pending' %}
-    <span class="status processing">جاري التنفيذ</span>
-    {% if o.note %}<div class="muted" style="max-width:260px;white-space:normal">آخر تحديث: {{ o.note }}</div>{% endif %}
-  {% elif o.status == 'completed' %}
-    <span class="status completed">مكتمل</span>
-  {% elif o.status == 'rejected' %}
-    <span class="status rejected">مرفوض</span>
-  {% else %}
-    <span class="status pending">{{ o.status }}</span>
-  {% endif %}
-</td>
-          <td>
+            {% if o.status == 'waiting' %}
+              <span class="status waiting">بانتظار التنفيذ</span>
+            {% elif o.status == 'manual_pending' %}
+              <span class="status pending">تنفيذ يدوي</span>
+              {% if o.note %}<div class="muted" style="max-width:260px;white-space:normal">السبب: {{ o.note }}</div>{% endif %}
+            {% elif o.status == 'processing' %}
+              <span class="status processing">جاري التنفيذ</span>
+            {% elif o.status == 'supplier_pending' %}
+              <span class="status processing">عند المورد</span>
+              {% if o.note %}<div class="muted" style="max-width:260px;white-space:normal">آخر تحديث: {{ o.note }}</div>{% endif %}
+            {% elif o.status == 'completed' %}
+              <span class="status completed">مكتمل</span>
+            {% elif o.status == 'rejected' %}
+              <span class="status rejected">مرفوض</span>
+            {% else %}
+              <span class="status pending">{{ o.status }}</span>
+            {% endif %}
+          </td>
+          <td style="white-space:nowrap">
+            {# V67.1: Retry pushes the order back to the supplier — useful
+               when manual_pending was set because of a transient supplier
+               failure (network, rate-limit, wrong product mapping). #}
+            {% if o.status in ('manual_pending', 'rejected', 'waiting', 'supplier_pending') %}
+              <form method="post" action="{{ url_for('admin_order_action', order_id=o.id, action='retry') }}" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn" type="submit" title="إعادة الإرسال إلى المورد">🔁 إعادة المحاولة</button>
+              </form>
+            {% endif %}
             <form method="post" action="{{ url_for('admin_order_action', order_id=o.id, action='complete') }}" style="display:inline">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn success" type="submit">إكمال</button></form>
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn success" type="submit">إكمال يدوي</button>
+            </form>
             <form method="post" action="{{ url_for('admin_order_action', order_id=o.id, action='reject') }}" style="display:inline">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger" type="submit">رفض</button></form>
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn danger" type="submit">رفض</button>
+            </form>
           </td>
         </tr>
       {% endfor %}

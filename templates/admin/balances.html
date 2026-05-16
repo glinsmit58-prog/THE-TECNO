@@ -5,7 +5,11 @@
   <div class="grid two">
     {% for key, value in balances.items() %}
       <div class="card">
-        <h2>{{ "سيرفر 1" if key=="server1" else "سيرفر 2" }}</h2>
+        <h2>
+          {% if key == "server2" %}🟢 Shop2Topup <span class="muted" style="font-weight:500;font-size:13px">(سيرفر 2)</span>
+          {% elif key == "server1" %}🔵 G2Bulk <span class="muted" style="font-weight:500;font-size:13px">(سيرفر 1)</span>
+          {% else %}{{ key }}{% endif %}
+        </h2>
         {% if value.error %}
           <p class="alert danger">فشل الاستعلام: {{ value.error }}</p>
         {% else %}

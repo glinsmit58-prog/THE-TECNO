@@ -33,7 +33,14 @@
         <label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <input type="checkbox" class="js-active-cb" name="active_game" value="{{ g.provider }}::{{ g.game_key }}" {% if g.active %}checked{% endif %}>
           <b>{{ g.emoji or '🎮' }} {{ g.name }}</b>
-          <span class="muted">({{ g.provider }} / {{ g.game_key }}) • {{ g.product_count or 0 }} باقة</span>
+          {# V67.1: provider badge so the operator can tell at a glance
+             which supplier each game belongs to. #}
+          {% if g.provider == 'server2' %}
+            <span class="provider-badge provider-server2">🟢 Shop2Topup</span>
+          {% elif g.provider == 'server1' %}
+            <span class="provider-badge provider-server1">🔵 G2Bulk</span>
+          {% endif %}
+          <span class="muted">({{ g.game_key }}) • {{ g.product_count or 0 }} باقة</span>
         </label>
 
         <div class="row-actions" style="align-items:center;gap:10px;flex-wrap:wrap">
