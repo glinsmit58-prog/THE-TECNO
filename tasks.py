@@ -139,7 +139,7 @@ def process_order(order_id: int):
       in-process worker.
     """
     from database import get_order, get_product_by_id, update_order, get_setting
-    from providers import create_provider_order
+    from providers import create_provider_order, normalize_supplier_create_status
 
     try:
         order = get_order(order_id)
@@ -175,29 +175,36 @@ def process_order(order_id: int):
             log.error("Order %s: invalid supplier response: %r", order_id, res)
             return
 
-        provider_order_id = (
-            res.get("order_id")
-            or (res.get("order", {}) if isinstance(res.get("order"), dict) else {}).get("order_id")
-            or res.get("order")
-            or ""
-        )
+        # V67 BUGFIX: previously we treated *any* response without an
+        # explicit "error" key as `completed`. That was wrong — most
+        # suppliers (G2Bulk especially) accept the order and return only
+        # an order id, with the actual fulfilment still pending. We were
+        # lying to the user that the order was completed.
+        # Use the canonical normaliser instead so:
+        #   - status="completed"     → completed
+        #   - status="pending"/empty → supplier_pending (poller will follow up)
+        #   - error/success=false    → manual_pending or rejected (auto-refund)
+        norm = normalize_supplier_create_status(product["provider"], res)
+        provider_order_id = norm.get("provider_order_id") or ""
 
-        if "error" in res or res.get("success") is False:
-            reason = res.get("error") or res.get("message") or str(res)
-            # V50.2 MEDIUM (M12): sanitise supplier error before storing in
-            # the order `note` column (which is later shown to admins and, via
-            # the orders API, reflected to users). Supplier responses can echo
-            # back our API key, internal IDs, or raw HTML payloads — redact
-            # anything that looks like a credential and truncate to 200 chars.
-            reason = _sanitise_supplier_note(reason)
+        if not norm.get("ok"):
+            reason = _sanitise_supplier_note(norm.get("error") or "Supplier error")
             status = "rejected" if auto_refund else "manual_pending"
             note = f"Supplier error{' (auto-refund)' if auto_refund else ''}: {reason}"
-            update_order(order_id, status, str(provider_order_id), note)
+            update_order(order_id, status, str(provider_order_id) or None, note)
             log.warning("Order %s rejected by supplier: %s", order_id, reason)
             return
 
-        update_order(order_id, "completed", str(provider_order_id), "Accepted by supplier")
-        log.info("Order %s completed (provider id=%s)", order_id, provider_order_id)
+        target_status = norm.get("status") or "supplier_pending"
+        # Only true completion ends the cycle; anything else stays pending
+        # for the periodic poller to pick up.
+        if target_status == "completed":
+            update_order(order_id, "completed", str(provider_order_id), "Accepted by supplier")
+            log.info("Order %s completed (provider id=%s)", order_id, provider_order_id)
+        else:
+            update_order(order_id, "supplier_pending", str(provider_order_id),
+                         "Awaiting supplier fulfilment")
+            log.info("Order %s queued at supplier (provider id=%s)", order_id, provider_order_id)
 
     except Exception as exc:
         log.exception("process_order error on order %s: %s", order_id, exc)
@@ -216,6 +223,84 @@ def enqueue_email(*args, **kwargs):
     if USE_RQ and _queue is not None:
         return _queue.enqueue(send_email_task, *args, **kwargs)
     return None  # caller falls back to thread queue
+
+
+# V67: Periodic supplier-status poller.
+# `process_order` parks any non-completed order in `supplier_pending` (or
+# `processing`) with the provider's order id. This sweep walks those rows,
+# asks the supplier for the latest status, and promotes them to
+# `completed` / `rejected` (with auto-refund when enabled). Without this,
+# orders that the supplier accepts but does not fulfil instantly stay
+# "جاري التنفيذ" forever — the exact bug reported by the user.
+def refresh_pending_orders(limit: int = 50) -> dict:
+    """Refresh status for pending orders that have a provider_order_id.
+
+    Returns a dict with counts of orders inspected / changed / errored,
+    safe to log or expose to admins.
+    """
+    from database import (
+        list_orders_for_auto_refresh,
+        get_product_by_id,
+        update_order,
+        get_setting,
+    )
+    from providers import get_provider_order_status, normalize_supplier_status
+
+    counters = {"checked": 0, "completed": 0, "rejected": 0, "errors": 0, "still_pending": 0}
+    auto_refund = get_setting("auto_refund_on_failure", "0") == "1"
+
+    try:
+        rows = list_orders_for_auto_refresh()
+    except Exception as exc:
+        log.exception("refresh_pending_orders: failed to list orders: %s", exc)
+        return counters
+
+    for o in (rows or [])[: max(1, int(limit))]:
+        counters["checked"] += 1
+        order_id = o.get("id")
+        provider_order_id = o.get("provider_order_id")
+        # `provider` is on orders directly; fall back to product lookup if missing.
+        provider = o.get("provider")
+        if not provider:
+            try:
+                product = get_product_by_id(o.get("product_id"))
+                if product:
+                    provider = product.get("provider")
+            except Exception:
+                provider = None
+        if not provider or not provider_order_id:
+            continue
+        try:
+            res = get_provider_order_status(provider, provider_order_id)
+            norm = normalize_supplier_status(provider, res)
+            new_status = (norm.get("status") or "").strip()
+            note = _sanitise_supplier_note(norm.get("note") or "")
+            if new_status == "completed":
+                update_order(order_id, "completed", str(provider_order_id),
+                             note or "Supplier completed")
+                counters["completed"] += 1
+            elif new_status == "manual_pending":
+                # Supplier reported failed/cancelled/refunded/partial.
+                if auto_refund:
+                    update_order(order_id, "rejected", str(provider_order_id),
+                                 f"{note} (auto-refund)" if note else "Auto-refund")
+                    counters["rejected"] += 1
+                else:
+                    update_order(order_id, "manual_pending", str(provider_order_id), note)
+                    counters["still_pending"] += 1
+            else:
+                # Still supplier_pending — leave as-is, just refresh the note.
+                if note and note != (o.get("note") or ""):
+                    update_order(order_id, o.get("status") or "supplier_pending",
+                                 str(provider_order_id), note)
+                counters["still_pending"] += 1
+        except Exception as exc:
+            counters["errors"] += 1
+            log.warning("refresh_pending_orders: order %s failed: %s", order_id, exc)
+            continue
+
+    log.info("refresh_pending_orders done: %s", counters)
+    return counters
 
 
 # Note: app.py uses enqueue_order_job() which dispatches between local

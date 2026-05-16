@@ -17,6 +17,7 @@ from werkzeug.utils import secure_filename
 from functools import wraps
 from dotenv import load_dotenv
 from flask import Response, Flask, render_template, request, redirect, url_for, session, flash, abort, jsonify, send_from_directory
+from markupsafe import Markup
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 from database import (
@@ -1911,7 +1912,15 @@ def checkout(product_id):
             return redirect(request.url)
 
         enqueue_order_job(order_id, product, player_id)
-        flash(f"تم استلام الطلب {code}. حالته الآن بانتظار بدء التنفيذ.", "success")
+        # V67: clearer confirmation with a clickable link to the orders page
+        # so the user can immediately track execution status. Also tells the
+        # user the order has been received (matches the wording the user
+        # asked for: "تم استلام طلب الشراء وبانتظار التنفيذ").
+        track_url = url_for("orders")
+        flash(Markup(
+            f'تم استلام الطلب <strong>{code}</strong> وبانتظار بدء التنفيذ. '
+            f'لمتابعة حالة طلبك <a href="{track_url}" class="alert-link"><strong>اضغط هنا</strong></a>.'
+        ), "success")
         return redirect(url_for("orders"))
     return render_template("checkout.html", product=product, game=game, show_server1=get_setting("show_server1", "1"),
         show_server2=get_setting("show_server2", "1"))
@@ -2041,7 +2050,13 @@ def wallet():
         dep = create_deposit(user["id"], amount, method_id, proof, amount_usd=amount_usd,
                              proof_filename=proof_filename_saved)
         if dep:
-            flash(f"تم إرسال طلب الشحن {dep[1]}، بانتظار موافقة الإدارة", "success")
+            # V67: clearer confirmation with a clickable link to the
+            # top-up requests page so the user can track approval status.
+            track_url = url_for("wallet_transactions")
+            flash(Markup(
+                f'تم استلام طلب الشحن <strong>{dep[1]}</strong> وبانتظار موافقة الإدارة. '
+                f'لمتابعة حالة طلبك <a href="{track_url}" class="alert-link"><strong>اضغط هنا</strong></a>.'
+            ), "success")
         else:
             flash("فشل إرسال طلب الشحن", "danger")
         return redirect(url_for("wallet"))
@@ -3001,6 +3016,32 @@ def admin_deposit_action(deposit_id, action):
     else:
         abort(404)
     return redirect(url_for("admin_deposits"))
+
+
+# V67: manual trigger for the supplier-status sweep. Useful when:
+#   1. The Redis worker isn't running (single-dyno Heroku free tier).
+#   2. An admin wants to immediately unstick orders without waiting for
+#      the next 90-second poll tick.
+@app.route("/admin/refresh-pending-orders", methods=["POST"])
+@login_required
+@admin_required
+@(limiter.limit("6 per minute") if limiter else (lambda f: f))
+def admin_refresh_pending_orders():
+    try:
+        from tasks import refresh_pending_orders
+        counters = refresh_pending_orders(limit=100)
+        flash(
+            f"تم الفحص: {counters.get('checked', 0)} طلب — "
+            f"اكتمل {counters.get('completed', 0)}، "
+            f"رُفض {counters.get('rejected', 0)}، "
+            f"لا يزال قيد الانتظار {counters.get('still_pending', 0)}، "
+            f"أخطاء {counters.get('errors', 0)}",
+            "success"
+        )
+    except Exception as exc:
+        log.exception("admin_refresh_pending_orders failed: %s", exc)
+        flash("فشل تحديث حالات الطلبات", "danger")
+    return redirect(request.referrer or url_for("admin_dashboard"))
 
 
 @app.route("/admin/payment-methods")
