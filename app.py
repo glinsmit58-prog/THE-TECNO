@@ -26,7 +26,7 @@ from database import (
     get_product, get_game, create_order, update_order, list_user_orders, list_orders,
     get_order, stats, list_users, search_users, get_user_by_id, user_financial_summary, list_user_deposits_admin, update_user_profile, set_pending_email_change, confirm_pending_email_change, set_user_balance, change_balance,
     list_payment_methods, get_payment_method, update_payment_method,
-    create_deposit, list_deposits, list_deposits_for_user, update_deposit, get_setting as _db_get_setting, set_setting as _db_set_setting,
+    create_deposit, list_deposits, list_deposits_for_user, get_deposit, update_deposit, get_setting as _db_get_setting, set_setting as _db_set_setting,
     list_orders_for_auto_refresh, get_order_public,
     list_all_games_for_admin, update_game_image, list_all_products_for_admin, update_product_sort_orders, update_profit_margin, seed_local_provider_catalog, attach_generated_posters,
     # V51 task B: admin 2FA persistence helpers
@@ -3264,11 +3264,38 @@ def admin_deposits():
 @admin_required
 @(limiter.limit("60 per minute") if limiter else (lambda f: f))
 def admin_deposit_action(deposit_id, action):
-    # V50.2 MEDIUM: audit trail for deposit approve/reject. Deposits are
-    # direct balance writes, so every admin decision is logged.
+    # V52 (task D): structured audit trail for deposit approve/reject.
+    # Deposits credit the user balance directly, so every admin decision
+    # is recorded in audit_log with old/new state and metadata (amount,
+    # currency, method, user_id) for forensic queryability — not just a
+    # log.warning grep contract. Keeps log.warning alongside so existing
+    # log aggregator alerts on "ADMIN_DEPOSIT_*" keep firing.
     admin = current_user()
+    deposit = get_deposit(deposit_id)
+    if not deposit:
+        abort(404)
     if action == "approve":
         ok = update_deposit(deposit_id, "approved")
+        log_audit(
+            "ADMIN_DEPOSIT_APPROVE",
+            actor_id=(admin or {}).get("id"),
+            actor_email=(admin or {}).get("email"),
+            target_type="deposit",
+            target_id=deposit_id,
+            ip=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            old={"status": deposit.get("status")},
+            new={"status": "approved"},
+            metadata={
+                "user_id": deposit.get("user_id"),
+                "amount": deposit.get("amount"),
+                "amount_usd": deposit.get("amount_usd"),
+                "currency": deposit.get("currency"),
+                "method": deposit.get("method"),
+                "deposit_code": deposit.get("deposit_code"),
+                "ok": bool(ok),
+            },
+        )
         log.warning(
             "ADMIN_DEPOSIT_APPROVE admin_id=%s admin_email=%s deposit_id=%s ok=%s ip=%s",
             (admin or {}).get("id"), (admin or {}).get("email"),
@@ -3277,6 +3304,26 @@ def admin_deposit_action(deposit_id, action):
         flash("تمت الموافقة وإضافة الرصيد" if ok else "لا يمكن تعديل هذا الطلب", "success" if ok else "warning")
     elif action == "reject":
         ok = update_deposit(deposit_id, "rejected")
+        log_audit(
+            "ADMIN_DEPOSIT_REJECT",
+            actor_id=(admin or {}).get("id"),
+            actor_email=(admin or {}).get("email"),
+            target_type="deposit",
+            target_id=deposit_id,
+            ip=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            old={"status": deposit.get("status")},
+            new={"status": "rejected"},
+            metadata={
+                "user_id": deposit.get("user_id"),
+                "amount": deposit.get("amount"),
+                "amount_usd": deposit.get("amount_usd"),
+                "currency": deposit.get("currency"),
+                "method": deposit.get("method"),
+                "deposit_code": deposit.get("deposit_code"),
+                "ok": bool(ok),
+            },
+        )
         log.warning(
             "ADMIN_DEPOSIT_REJECT admin_id=%s admin_email=%s deposit_id=%s ok=%s ip=%s",
             (admin or {}).get("id"), (admin or {}).get("email"),
