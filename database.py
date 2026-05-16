@@ -772,6 +772,23 @@ def set_game_show_on_home(provider, game_key, show):
         conn.commit()
 
 
+# V68: ترتيب ظهور اللعبة في الواجهة الرئيسية.
+# 0 = الترتيب الافتراضي (حسب الاسم). أي رقم أكبر من 0 يعطي ترتيبًا يدويًا.
+def set_game_home_sort_order(provider, game_key, sort_order):
+    try:
+        v = int(sort_order or 0)
+    except Exception:
+        v = 0
+    if v < 0:
+        v = 0
+    with db_conn() as conn:
+        conn.execute(
+            "UPDATE games SET home_sort_order=? WHERE provider=? AND game_key=?",
+            (v, provider, game_key),
+        )
+        conn.commit()
+
+
 def list_home_games():
     """Return only games flagged by admin as visible on homepage, with product_count & min_price.
     Falls back to an empty list; caller decides the fallback policy."""

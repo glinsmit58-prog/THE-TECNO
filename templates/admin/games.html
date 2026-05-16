@@ -26,41 +26,128 @@
 
   <div class="muted" id="gameCounter" style="margin:8px 0"></div>
 
-  <div class="admin-games-list searchable-games" id="adminGamesList">
-    {% for g in games %}
-      <div class="admin-game-row {% if g.active %}is-active{% else %}is-hidden-initial{% endif %}"
-           data-game-name="{{ (g.name ~ ' ' ~ g.game_key ~ ' ' ~ g.provider)|lower }}">
-        <label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <input type="checkbox" class="js-active-cb" name="active_game" value="{{ g.provider }}::{{ g.game_key }}" {% if g.active %}checked{% endif %}>
-          <b>{{ g.emoji or '🎮' }} {{ g.name }}</b>
-          {# V67.1: provider badge so the operator can tell at a glance
-             which supplier each game belongs to. #}
-          {% if g.provider == 'server2' %}
-            <span class="provider-badge provider-server2">🟢 Shop2Topup</span>
-          {% elif g.provider == 'server1' %}
-            <span class="provider-badge provider-server1">🔵 G2Bulk</span>
-          {% endif %}
-          <span class="muted">({{ g.game_key }}) • {{ g.product_count or 0 }} باقة</span>
-        </label>
-
-        <div class="row-actions" style="align-items:center;gap:10px;flex-wrap:wrap">
-          <label class="muted" style="display:inline-flex;gap:6px;align-items:center;font-size:.85rem">
-            <input type="checkbox" class="js-home-cb" name="home_game"
-                   value="{{ g.provider }}::{{ g.game_key }}"
-                   {% if g.show_on_home %}checked{% endif %}
-                   {% if not g.active %}disabled{% endif %}>
-            إظهار في الرئيسية
-          </label>
-          {# V62.1 FIX: was {% if g.image_url %} — that left a blank slot for
-             games without an admin upload. Use the game_image() helper so
-             the smart SVG fallback (static/img/smart-games/*.svg) is shown
-             for every game that doesn't have a custom image yet. #}
-          <img src="{{ game_image(g) }}" alt="{{ g.name }}" loading="lazy"
-               style="width:46px;height:46px;object-fit:cover;border-radius:12px;border:1px solid rgba(255,255,255,.12)">
-          <a class="btn small" href="{{ url_for('admin_game_products', provider=g.provider, game_key=g.game_key) }}">ترتيب الباقات</a>
+  {# V68: عرض السيرفرات في عمودين منفصلين، مع زر إيقاف لكل سيرفر.
+     عند إيقاف السيرفر تختفي جميع ألعابه من الواجهة الرئيسية ومن /all-games. #}
+  <div class="admin-servers-grid">
+    {# ============== السيرفر 1 ============== #}
+    <div class="admin-server-col {% if not server1_enabled %}server-off{% endif %}" data-provider="server1">
+      <div class="admin-server-head">
+        <div class="admin-server-title">
+          <span class="provider-badge provider-server1">🔵 السيرفر 1 — G2Bulk</span>
+          <span class="muted small">({{ server1_games|length }} لعبة)</span>
         </div>
+        <label class="server-toggle" title="عند إيقاف السيرفر تختفي كل ألعابه من الواجهة الرئيسية">
+          <input type="checkbox" name="server1_enabled" value="1" class="js-server-toggle"
+                 data-target="server1" {% if server1_enabled %}checked{% endif %}>
+          <span class="server-toggle-label">
+            <b class="on-label">السيرفر مُفعَّل</b>
+            <b class="off-label">السيرفر مُوقَف ✋</b>
+          </span>
+        </label>
       </div>
-    {% endfor %}
+
+      <div class="admin-games-list searchable-games server-games" data-provider="server1">
+        {% for g in server1_games %}
+          <div class="admin-game-row {% if g.active %}is-active{% else %}is-hidden-initial{% endif %}"
+               data-provider="server1"
+               data-game-name="{{ (g.name ~ ' ' ~ g.game_key ~ ' ' ~ g.provider)|lower }}">
+            <label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <input type="checkbox" class="js-active-cb" name="active_game" value="{{ g.provider }}::{{ g.game_key }}" {% if g.active %}checked{% endif %}>
+              <b>{{ g.emoji or '🎮' }} {{ g.name }}</b>
+              <span class="muted">({{ g.game_key }}) • {{ g.product_count or 0 }} باقة</span>
+            </label>
+
+            <div class="row-actions" style="align-items:center;gap:8px;flex-wrap:wrap">
+              <label class="muted home-cb-label" title="إظهار في الرئيسية">
+                <input type="checkbox" class="js-home-cb" name="home_game"
+                       value="{{ g.provider }}::{{ g.game_key }}"
+                       {% if g.show_on_home %}checked{% endif %}
+                       {% if not g.active %}disabled{% endif %}>
+                إظهار في الرئيسية
+              </label>
+
+              {# V68: ترتيب اللعبة في الرئيسية + أزرار سهم لرفع/إنزال السطر. #}
+              <div class="sort-controls" title="ترتيب الظهور في الرئيسية. الأرقام الأصغر تظهر أولاً. 0 = ترتيب افتراضي">
+                <button type="button" class="btn small icon-btn js-move-up" aria-label="رفع للأعلى">▲</button>
+                <input type="number" min="0" max="9999" step="1"
+                       class="sort-input js-sort-input"
+                       name="sort_order::{{ g.provider }}::{{ g.game_key }}"
+                       value="{{ g.home_sort_order or 0 }}" aria-label="ترتيب الظهور">
+                <button type="button" class="btn small icon-btn js-move-down" aria-label="إنزال للأسفل">▼</button>
+              </div>
+
+              <img src="{{ game_image(g) }}" alt="{{ g.name }}" loading="lazy"
+                   style="width:42px;height:42px;object-fit:cover;border-radius:10px;border:1px solid rgba(255,255,255,.12)">
+              <a class="btn small" href="{{ url_for('admin_game_products', provider=g.provider, game_key=g.game_key) }}">ترتيب الباقات</a>
+            </div>
+          </div>
+        {% else %}
+          <p class="empty-state" style="margin:8px 0">لا توجد ألعاب على هذا السيرفر بعد.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# ============== السيرفر 2 ============== #}
+    <div class="admin-server-col {% if not server2_enabled %}server-off{% endif %}" data-provider="server2">
+      <div class="admin-server-head">
+        <div class="admin-server-title">
+          <span class="provider-badge provider-server2">🟢 السيرفر 2 — Shop2Topup</span>
+          <span class="muted small">({{ server2_games|length }} لعبة)</span>
+        </div>
+        <label class="server-toggle" title="عند إيقاف السيرفر تختفي كل ألعابه من الواجهة الرئيسية">
+          <input type="checkbox" name="server2_enabled" value="1" class="js-server-toggle"
+                 data-target="server2" {% if server2_enabled %}checked{% endif %}>
+          <span class="server-toggle-label">
+            <b class="on-label">السيرفر مُفعَّل</b>
+            <b class="off-label">السيرفر مُوقَف ✋</b>
+          </span>
+        </label>
+      </div>
+
+      <div class="admin-games-list searchable-games server-games" data-provider="server2">
+        {% for g in server2_games %}
+          <div class="admin-game-row {% if g.active %}is-active{% else %}is-hidden-initial{% endif %}"
+               data-provider="server2"
+               data-game-name="{{ (g.name ~ ' ' ~ g.game_key ~ ' ' ~ g.provider)|lower }}">
+            <label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <input type="checkbox" class="js-active-cb" name="active_game" value="{{ g.provider }}::{{ g.game_key }}" {% if g.active %}checked{% endif %}>
+              <b>{{ g.emoji or '🎮' }} {{ g.name }}</b>
+              <span class="muted">({{ g.game_key }}) • {{ g.product_count or 0 }} باقة</span>
+            </label>
+
+            <div class="row-actions" style="align-items:center;gap:8px;flex-wrap:wrap">
+              <label class="muted home-cb-label" title="إظهار في الرئيسية">
+                <input type="checkbox" class="js-home-cb" name="home_game"
+                       value="{{ g.provider }}::{{ g.game_key }}"
+                       {% if g.show_on_home %}checked{% endif %}
+                       {% if not g.active %}disabled{% endif %}>
+                إظهار في الرئيسية
+              </label>
+
+              <div class="sort-controls" title="ترتيب الظهور في الرئيسية. الأرقام الأصغر تظهر أولاً. 0 = ترتيب افتراضي">
+                <button type="button" class="btn small icon-btn js-move-up" aria-label="رفع للأعلى">▲</button>
+                <input type="number" min="0" max="9999" step="1"
+                       class="sort-input js-sort-input"
+                       name="sort_order::{{ g.provider }}::{{ g.game_key }}"
+                       value="{{ g.home_sort_order or 0 }}" aria-label="ترتيب الظهور">
+                <button type="button" class="btn small icon-btn js-move-down" aria-label="إنزال للأسفل">▼</button>
+              </div>
+
+              <img src="{{ game_image(g) }}" alt="{{ g.name }}" loading="lazy"
+                   style="width:42px;height:42px;object-fit:cover;border-radius:10px;border:1px solid rgba(255,255,255,.12)">
+              <a class="btn small" href="{{ url_for('admin_game_products', provider=g.provider, game_key=g.game_key) }}">ترتيب الباقات</a>
+            </div>
+          </div>
+        {% else %}
+          <p class="empty-state" style="margin:8px 0">لا توجد ألعاب على هذا السيرفر بعد.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="muted" style="margin:10px 0;font-size:.88rem">
+    💡 <b>نصيحة:</b> الأرقام الأصغر تظهر أولاً في الواجهة الرئيسية. الرقم <b>0</b> يعني "ترتيب افتراضي حسب الاسم".
+    استخدم أزرار ▲ ▼ لتحريك اللعبة لأعلى/أسفل بنقرة واحدة، ثم اضغط <b>حفظ</b>.
   </div>
 
   <button class="btn primary" type="submit">حفظ الألعاب المعروضة</button>
