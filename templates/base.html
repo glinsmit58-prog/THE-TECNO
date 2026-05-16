@@ -42,7 +42,7 @@
      intentionally NOT loaded so their look does not bleed through.
      V61: bumped query string so cached browsers pick up the smoother
      game-card redesign without waiting on the SW to refresh. #}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/v60-neon.css') }}?v=66">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/v60-neon.css') }}?v=67">
   <link rel="preload" as="image" href="{{ url_for('static', filename='img/tecnogems-logo.webp') }}" fetchpriority="high">
   <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
   <link rel="icon" type="image/webp" href="{{ url_for('static', filename='img/logo-32.webp') }}">
@@ -78,10 +78,9 @@
       {# Desktop primary nav #}
       <nav class="v60-nav-links" aria-label="primary">
         <a href="{{ url_for('home') }}#games">{{ "Games" if is_en else "الألعاب" }}</a>
-        <a href="{{ url_for('home') }}#features">{{ "Why us" if is_en else "لماذا نحن" }}</a>
-        <a href="{{ url_for('home') }}#how-it-works">{{ "How it works" if is_en else "كيف يعمل" }}</a>
         {% if current_user %}
           <a href="{{ url_for('wallet') }}">{{ t("topup_wallet") }}</a>
+          <a href="{{ url_for('wallet_transactions') }}">{{ "Top-up requests" if is_en else "طلبات الشحن" }}</a>
           <a href="{{ url_for('orders') }}">{{ t("my_orders") }}</a>
           {% if current_user.role == 'admin' %}
             <a href="{{ url_for('admin_dashboard') }}" style="color:var(--neon)">{{ "Admin" if is_en else "الإدارة" }}</a>
@@ -95,7 +94,7 @@
         {% if current_user %}
           <a class="v60-nav-balance" href="{{ url_for('wallet') }}" title="{{ t('balance') }}">
             <svg {{ _ico|safe }}><path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2H5a2 2 0 0 1-2-2z"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2"/><path d="M17 14h.01"/></svg>
-            <span>{{ wallet_money(current_user.balance) }}</span>
+            <span id="tg-nav-balance" data-balance="{{ '%.2f'|format(current_user.balance|float) }}">{{ wallet_money(current_user.balance) }}</span>
           </a>
           <a class="v60-btn v60-btn-glass" href="{{ url_for('profile') }}" title="{{ 'Profile' if is_en else 'الملف الشخصي' }}">
             <svg {{ _ico|safe }}><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
@@ -116,13 +115,11 @@
     {# Mobile menu panel #}
     <div class="v60-mobile-panel" id="v60-mobile-panel">
       <a href="{{ url_for('home') }}#games">{{ "Games" if is_en else "الألعاب" }}</a>
-      <a href="{{ url_for('home') }}#features">{{ "Why us" if is_en else "لماذا نحن" }}</a>
-      <a href="{{ url_for('home') }}#how-it-works">{{ "How it works" if is_en else "كيف يعمل" }}</a>
       <a href="{{ url_for('all_games') }}">{{ "All games" if is_en else "جميع الألعاب" }}</a>
       {% if current_user %}
         <a href="{{ url_for('wallet') }}">{{ t("topup_wallet") }}</a>
+        <a href="{{ url_for('wallet_transactions') }}">{{ "Top-up requests" if is_en else "طلبات الشحن" }}</a>
         <a href="{{ url_for('orders') }}">{{ t("my_orders") }}</a>
-        <a href="{{ url_for('wallet_transactions') }}">{{ t("wallet_records") }}</a>
         <a href="{{ url_for('profile') }}">{{ "Profile" if is_en else "الملف الشخصي" }}</a>
         {% if current_user.role == 'admin' %}
           <a href="{{ url_for('admin_dashboard') }}" style="color:var(--neon)">{{ "Admin" if is_en else "الإدارة" }}</a>

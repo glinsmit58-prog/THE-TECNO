@@ -38,12 +38,14 @@
 
   <form method="post" id="checkout-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label>{{ t("player_id") }}</label>
-    <input name="player_id" id="player_id" required minlength="3" maxlength="64"
-           placeholder="{{ t('example_id') }}" autocomplete="off"
-           oninput="clearPlayerErr()">
+    <label class="checkout-field-label" for="player_id">{{ t("player_id") }}</label>
+    <div class="checkout-id-wrap">
+      <input class="checkout-id-input" name="player_id" id="player_id" required minlength="3" maxlength="64"
+             placeholder="{{ t('example_id') }}" autocomplete="off" inputmode="numeric"
+             oninput="clearPlayerErr()">
+    </div>
     <span class="field-error" id="err-player-id"></span>
-    <p class="muted" style="font-size:12px;margin-top:6px">
+    <p class="muted checkout-id-hint">
       {{ "Make sure the Player ID is correct. Top-ups cannot be reversed." if is_en else "تأكد من صحة معرف اللاعب. لا يمكن استرداد الشحنة بعد التنفيذ." }}
     </p>
     <button class="btn primary checkout-confirm-btn" type="submit" id="checkout-btn" style="margin-top:18px;width:100%">
