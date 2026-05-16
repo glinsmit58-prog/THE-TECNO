@@ -5,7 +5,7 @@
   <form method="post" class="auth-form" id="reg-form" novalidate
         data-err-name="{{ 'Name is required' if is_en else 'الاسم مطلوب' }}"
         data-err-email="{{ 'Enter a valid email' if is_en else 'أدخل بريداً إلكترونياً صحيحاً' }}"
-        data-err-password="{{ 'Minimum 6 characters' if is_en else '6 أحرف على الأقل' }}"
+        data-err-password="{{ 'Minimum 8 characters' if is_en else '8 أحرف على الأقل' }}"
         data-err-mismatch="{{ 'Passwords do not match' if is_en else 'كلمتا المرور غير متطابقتين' }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 

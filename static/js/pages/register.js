@@ -71,8 +71,8 @@ document.getElementById('reg-form').addEventListener('submit', function(e) {
     email.classList.add('input-err'); ok = false;
   } else email.classList.remove('input-err');
 
-  if (pass.value.length < 6) {
-    document.getElementById('err-reg-password').textContent = form.dataset.errPassword || 'Minimum 6 characters';
+  if (pass.value.length < 8) {
+    document.getElementById('err-reg-password').textContent = form.dataset.errPassword || 'Minimum 8 characters';
     pass.classList.add('input-err'); ok = false;
   } else pass.classList.remove('input-err');
 
