@@ -416,6 +416,29 @@ MAIL_USE_TLS = os.getenv("MAIL_USE_TLS", "1") == "1"
 MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
 MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "").replace(" ", "").strip()
 MAIL_FROM = os.getenv("MAIL_FROM", MAIL_USERNAME or "no-reply@tecnogems.com")
+# V67 DELIVERABILITY: friendly From-name, Reply-To, and explicit envelope sender.
+# When using Gmail/Workspace SMTP, the envelope sender MUST equal the
+# authenticated mailbox or the message fails SPF alignment and lands in Spam.
+MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "TecnoGems").strip() or "TecnoGems"
+MAIL_REPLY_TO = os.getenv("MAIL_REPLY_TO", "").strip()
+# Domain used in Message-ID and List-Unsubscribe URLs.
+try:
+    _BASE_DOMAIN = BASE_URL.split("//", 1)[-1].split("/", 1)[0]
+except Exception:
+    _BASE_DOMAIN = "tecnogems.com"
+
+
+def _aligned_envelope_sender():
+    """Return the SMTP envelope sender that aligns with the SMTP login.
+
+    Gmail / Google Workspace REWRITE the From: header to the authenticated
+    mailbox if it doesn't match. To preserve a clean From: while still
+    passing SPF/DKIM alignment, we set the SMTP-level MAIL FROM (envelope)
+    to the authenticated user. Most consumer mailbox providers honour this.
+    """
+    if MAIL_USERNAME and "@" in MAIL_USERNAME:
+        return MAIL_USERNAME
+    return MAIL_FROM
 
 
 # --- Public language system (Arabic default / English optional) ---
@@ -713,15 +736,29 @@ def _send_email_sync(to_email, subject, body, html_body=None):
     # Build multipart message (plain + HTML) to improve deliverability
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = formataddr(("TecnoGems", MAIL_FROM))
+    # V67 DELIVERABILITY: From, Sender, Reply-To
+    # Gmail rewrites From: to the auth user if MAIL_FROM differs, but if we
+    # explicitly set Sender: to the auth user we keep the friendly From: AND
+    # pass SPF/DKIM alignment. Reply-To routes user replies to the inbox we
+    # actually monitor.
+    msg["From"] = formataddr((MAIL_FROM_NAME, MAIL_FROM))
+    if MAIL_USERNAME and MAIL_USERNAME.lower() != MAIL_FROM.lower():
+        msg["Sender"] = MAIL_USERNAME
     msg["To"] = to_email
-    msg["Reply-To"] = MAIL_FROM
+    msg["Reply-To"] = MAIL_REPLY_TO or MAIL_FROM
     msg["Date"] = formatdate(localtime=True)
-    msg["Message-ID"] = make_msgid(domain=MAIL_FROM.split("@")[-1] if "@" in MAIL_FROM else "tecnogems.com")
-    # Anti-spam headers
-    msg["X-Mailer"] = "TecnoGems Mailer"
-    msg["Precedence"] = "bulk"
-    msg["List-Unsubscribe"] = f"<mailto:{MAIL_FROM}?subject=unsubscribe>"
+    msg["Message-ID"] = make_msgid(domain=MAIL_FROM.split("@")[-1] if "@" in MAIL_FROM else _BASE_DOMAIN)
+    # V67 DELIVERABILITY headers for transactional mail.
+    # IMPORTANT: do NOT add "Precedence: bulk" or a mailto-only
+    # List-Unsubscribe — those are signals for newsletters and push
+    # account-verification mail straight into Spam at Gmail.
+    msg["X-Mailer"] = "TecnoGems Transactional Mailer"
+    msg["X-Auto-Response-Suppress"] = "All"
+    msg["Auto-Submitted"] = "auto-generated"
+    msg["X-Entity-Ref-ID"] = make_msgid(domain=_BASE_DOMAIN).strip("<>")
+    # MIME-Version is required by some spam filters even though Python adds
+    # it automatically — set it explicitly so it always lands at the top.
+    msg["MIME-Version"] = "1.0"
 
     # Attach plain text first (fallback)
     part_text = MIMEText(body, "plain", "utf-8")
@@ -737,7 +774,15 @@ def _send_email_sync(to_email, subject, body, html_body=None):
                 server.starttls()
                 server.ehlo()
             server.login(MAIL_USERNAME, MAIL_PASSWORD)
-            server.send_message(msg)
+            # V67 DELIVERABILITY: pass an explicit envelope sender that is
+            # always the authenticated mailbox. This is the SPF-aligned
+            # address — without it Gmail rewrites the bounce path and the
+            # message can fail SPF.
+            server.send_message(
+                msg,
+                from_addr=_aligned_envelope_sender(),
+                to_addrs=[to_email],
+            )
         app.logger.info("Email sent successfully to=%s subject=%s", to_email, subject)
     except smtplib.SMTPAuthenticationError as exc:
         app.logger.error(
@@ -788,6 +833,8 @@ def send_email(to_email, subject, body, html_body=None):
                 MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD,
                 MAIL_USE_TLS, MAIL_FROM,
                 html_body=html_body,
+                mail_from_name=MAIL_FROM_NAME,
+                reply_to=MAIL_REPLY_TO or MAIL_FROM,
             )
             return
     except Exception as exc:
@@ -843,6 +890,7 @@ def _build_email_html(title, greeting, message, button_text, button_url, footer_
 <tr><td style="padding:0 32px 32px;border-top:1px solid #334155;">
   <p style="margin:20px 0 0;font-size:12px;color:#475569;line-height:1.6;text-align:center;">
     {footer_note}<br>
+    <a href="{BASE_URL}/email-info" style="color:#64748b;text-decoration:underline;">لماذا وصلتك هذه الرسالة؟</a><br>
     <span style="color:#64748b;">&copy; TecnoGems - جميع الحقوق محفوظة</span>
   </p>
 </td></tr>
@@ -855,20 +903,32 @@ def _build_email_html(title, greeting, message, button_text, button_url, footer_
 
 def send_verification_email(to_email, token):
     link = f"{BASE_URL}/verify-email/{token}"
+    # V67 DELIVERABILITY: richer plain-text body. A near-empty plain-text
+    # part with a heavy HTML part is one of the strongest spam signals at
+    # Gmail. Match the HTML content closely in plain text.
     body = f"""مرحبًا بك في TecnoGems
 
-لتفعيل حسابك اضغط على الرابط التالي:
+شكرًا لإنشاء حسابك. لتفعيل بريدك الإلكتروني والبدء في استخدام المنصة،
+افتح الرابط التالي خلال 24 ساعة:
+
 {link}
 
-إذا لم تطلب إنشاء حساب، تجاهل هذه الرسالة.
+إذا لم تطلب إنشاء حساب على TecnoGems يمكنك تجاهل هذه الرسالة بأمان،
+ولن يتم إنشاء أي حساب باستخدام بريدك.
+
+— فريق TecnoGems
+{BASE_URL}
+
+ملاحظة: هذه رسالة تلقائية لتأكيد البريد الإلكتروني، يرجى عدم الرد عليها.
+للدعم تواصل معنا عبر صفحة الدعم على الموقع.
 """
     html_body = _build_email_html(
         title="تفعيل حسابك - TecnoGems",
         greeting="مرحبًا بك في TecnoGems!",
-        message="شكرًا لإنشاء حسابك. لتفعيل بريدك الإلكتروني والبدء في استخدام المنصة، اضغط على الزر أدناه:",
+        message="شكرًا لإنشاء حسابك. لتفعيل بريدك الإلكتروني والبدء في استخدام المنصة، اضغط على الزر أدناه. صلاحية الرابط 24 ساعة.",
         button_text="تفعيل الحساب",
         button_url=link,
-        footer_note="إذا لم تقم بإنشاء حساب في TecnoGems، يمكنك تجاهل هذه الرسالة بأمان.",
+        footer_note="إذا لم تقم بإنشاء حساب في TecnoGems، يمكنك تجاهل هذه الرسالة بأمان. هذه رسالة تلقائية، لا تردّ عليها.",
     )
     # V62.1 FIX: send synchronously so SMTP errors surface to the caller
     # (registration / resend-verification) instead of being silently swallowed
@@ -883,13 +943,24 @@ def send_verification_email(to_email, token):
 
 def send_password_reset_email(to_email, token):
     link = f"{BASE_URL}/reset-password/{token}"
+    # V67 DELIVERABILITY: plain text mirrors HTML content for a healthier
+    # text-to-html ratio.
     body = f"""مرحبًا
 
-لاستعادة كلمة المرور اضغط على الرابط التالي:
+تلقينا طلبًا لإعادة تعيين كلمة المرور الخاصة بحسابك على TecnoGems.
+
+لإنشاء كلمة مرور جديدة، افتح الرابط التالي:
 {link}
 
-صلاحية الرابط ساعة واحدة فقط.
-إذا لم تطلب استعادة كلمة المرور، تجاهل هذه الرسالة.
+صلاحية الرابط ساعة واحدة فقط من تاريخ إرسال هذه الرسالة.
+إذا لم تطلب استعادة كلمة المرور يمكنك تجاهل هذه الرسالة، حسابك آمن
+ولن يتم إجراء أي تغيير.
+
+— فريق TecnoGems
+{BASE_URL}
+
+ملاحظة: هذه رسالة تلقائية، يرجى عدم الرد عليها.
+للدعم تواصل معنا عبر صفحة الدعم على الموقع.
 """
     html_body = _build_email_html(
         title="استعادة كلمة المرور - TecnoGems",
@@ -897,7 +968,7 @@ def send_password_reset_email(to_email, token):
         message="تلقينا طلبًا لإعادة تعيين كلمة المرور الخاصة بحسابك. اضغط على الزر أدناه لإنشاء كلمة مرور جديدة. صلاحية الرابط ساعة واحدة فقط.",
         button_text="إعادة تعيين كلمة المرور",
         button_url=link,
-        footer_note="إذا لم تطلب استعادة كلمة المرور، يمكنك تجاهل هذه الرسالة. حسابك آمن.",
+        footer_note="إذا لم تطلب استعادة كلمة المرور، يمكنك تجاهل هذه الرسالة. حسابك آمن. هذه رسالة تلقائية، لا تردّ عليها.",
     )
     # V62.1 FIX: same reason as send_verification_email — send synchronously
     # so the user gets a real error message when SMTP misbehaves.
@@ -910,10 +981,18 @@ def send_email_change_confirmation(to_email, token):
     link = f"{BASE_URL}/confirm-email-change/{token}"
     body = f"""مرحبًا
 
-لتأكيد تغيير البريد الإلكتروني في TecnoGems اضغط الرابط التالي:
+تلقينا طلبًا لتغيير البريد الإلكتروني المرتبط بحسابك على TecnoGems.
+
+لتأكيد التغيير، افتح الرابط التالي:
 {link}
 
-إذا لم تطلب تغيير البريد، تجاهل هذه الرسالة.
+إذا لم تطلب تغيير البريد يمكنك تجاهل هذه الرسالة، ولن يتم إجراء أي
+تعديل على حسابك.
+
+— فريق TecnoGems
+{BASE_URL}
+
+ملاحظة: هذه رسالة تلقائية، يرجى عدم الرد عليها.
 """
     html_body = _build_email_html(
         title="تأكيد تغيير البريد - TecnoGems",
@@ -1477,6 +1556,72 @@ def robots_txt():
 @app.route("/manifest.json")
 def manifest_json():
     return app.send_static_file("manifest.json")
+
+
+# V67 DELIVERABILITY: public, no-auth informational page about our mail.
+# Linked from email footers — boosts Gmail's trust signal that the sender
+# operates a real, navigable HTTPS site for the From: domain. Also serves
+# as a no-cost replacement for List-Unsubscribe (removed from headers
+# because it incorrectly classified transactional mail as bulk).
+@app.route("/email-info")
+def email_info():
+    html = """<!doctype html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>عن رسائل البريد الإلكتروني — TecnoGems</title>
+<meta name="robots" content="index,follow">
+<style>
+body{{font-family:Arial,Helvetica,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:32px;line-height:1.8}}
+main{{max-width:720px;margin:0 auto;background:#1e293b;padding:32px;border-radius:12px;border:1px solid #334155}}
+h1{{color:#a78bfa;margin-top:0}}
+h2{{color:#c4b5fd;margin-top:28px;font-size:18px}}
+a{{color:#a78bfa}}
+code{{background:#0f172a;padding:2px 6px;border-radius:4px;font-size:13px}}
+.note{{background:#0f172a;padding:14px 18px;border-right:3px solid #7c3aed;border-radius:6px;margin:16px 0}}
+</style>
+</head><body><main>
+<h1>عن رسائل البريد الإلكتروني من TecnoGems</h1>
+
+<p>تُرسل TecnoGems رسائل بريد إلكتروني <strong>خدمية فقط</strong> (transactional)
+للأشخاص الذين أنشأوا حسابًا على المنصة، وذلك في الحالات التالية:</p>
+<ul>
+  <li>تفعيل البريد الإلكتروني عند إنشاء حساب جديد.</li>
+  <li>استعادة كلمة المرور بناءً على طلبك.</li>
+  <li>تأكيد تغيير البريد الإلكتروني المرتبط بحسابك.</li>
+</ul>
+
+<h2>لماذا وصلتك هذه الرسالة؟</h2>
+<p>نحن لا نُرسل رسائل ترويجية أو نشرات بريدية. إذا وصلتك رسالة منا فهذا يعني
+أن أحدًا (غالبًا أنت) أدخل بريدك في صفحة إنشاء الحساب أو استعادة كلمة المرور
+على <a href="{base_url}">{domain}</a>.</p>
+
+<div class="note">
+لم تنشئ حسابًا؟ يمكنك تجاهل الرسالة بأمان، فلن يُفعَّل أي حساب على بريدك إلا
+بالنقر على رابط التفعيل.
+</div>
+
+<h2>إيقاف الرسائل</h2>
+<p>بما أن جميع الرسائل خدمية ومرتبطة بحسابك، فإن أبسط طريقة لإيقافها هي
+حذف الحساب من <a href="{base_url}/profile">صفحة الملف الشخصي</a>،
+أو التواصل مع فريق الدعم.</p>
+
+<h2>المُرسل</h2>
+<p>تصل الرسائل من العنوان الموضح في حقل <code>From</code>،
+وهو عنوان معتمد ومُهيأ بسجلات SPF و DKIM و DMARC على نطاق
+<code>{domain}</code>.</p>
+
+<h2>تواصل</h2>
+<p>للإبلاغ عن رسالة مشبوهة أو طلب الدعم، تواصل معنا عبر
+<a href="{base_url}/">الموقع الرسمي</a>.</p>
+
+<p style="text-align:center;margin-top:32px;color:#64748b;font-size:13px;">
+&copy; TecnoGems — جميع الحقوق محفوظة
+</p>
+</main></body></html>""".format(base_url=BASE_URL, domain=_BASE_DOMAIN)
+    resp = Response(html, mimetype="text/html; charset=utf-8")
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
 
 
 @app.route("/sitemap.xml")
