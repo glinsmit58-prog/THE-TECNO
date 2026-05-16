@@ -11,6 +11,37 @@ from typing import Dict, Any
 G2BULK_API_KEY = os.getenv("G2BULK_API_KEY", "").strip()
 G2BULK_API_URL = os.getenv("G2BULK_API_URL", "https://api.g2bulk.com/api/v2")
 
+# V70: ترجمة عربية لرسائل أخطاء G2Bulk الشائعة لتظهر مفهومة للإدارة بدل
+# الإنجليزية الخام. الـ API لا يرجع كود ثابت، بل نص حر — لذا نطابق
+# substring بحساسية حالة منخفضة. أي خطأ غير مطابق يبقى كما ورد من المورد.
+_G2BULK_AR_TRANSLATIONS = [
+    ("not enough funds",      "رصيد المورد (G2Bulk) غير كافٍ. يرجى شحن الحساب."),
+    ("insufficient",          "رصيد المورد (G2Bulk) غير كافٍ. يرجى شحن الحساب."),
+    ("incorrect link",        "معرّف اللاعب غير صحيح لدى المورد."),
+    ("invalid link",          "معرّف اللاعب غير صحيح لدى المورد."),
+    ("invalid service",       "الباقة غير متاحة لدى المورد. يلزم إعادة مزامنة الكتالوج."),
+    ("service is disabled",   "الباقة معطّلة حاليًا لدى المورد."),
+    ("service disabled",      "الباقة معطّلة حاليًا لدى المورد."),
+    ("not active",            "الباقة غير متاحة حاليًا لدى المورد."),
+    ("out of stock",          "الباقة غير متوفرة حاليًا لدى المورد."),
+    ("rate limit",            "تم تجاوز حد الطلبات لدى المورد، أعد المحاولة بعد قليل."),
+    ("too many requests",     "تم تجاوز حد الطلبات لدى المورد، أعد المحاولة بعد قليل."),
+    ("incorrect quantity",    "الكمية المطلوبة غير صحيحة لدى المورد."),
+    ("invalid api key",       "مفتاح API الخاص بـ G2Bulk غير صحيح."),
+    ("invalid key",           "مفتاح API الخاص بـ G2Bulk غير صحيح."),
+    ("incorrect api key",     "مفتاح API الخاص بـ G2Bulk غير صحيح."),
+]
+
+
+def _translate_g2bulk_error(message: str) -> str:
+    if not message:
+        return message
+    low = str(message).lower()
+    for needle, ar in _G2BULK_AR_TRANSLATIONS:
+        if needle in low:
+            return ar
+    return message
+
 SHOP2TOPUP_API_KEY = os.getenv("SHOP2TOPUP_API_KEY", "").strip()
 if SHOP2TOPUP_API_KEY.lower().startswith("bearer "):
     SHOP2TOPUP_API_KEY = SHOP2TOPUP_API_KEY.split(" ", 1)[1].strip()
@@ -35,7 +66,8 @@ def g2bulk_request(action: str, params: Dict[str, Any] | None = None) -> Dict[st
 
         # توحيد شكل الأخطاء
         if isinstance(data, dict) and data.get("error"):
-            return {"error": data.get("error"), "raw": data}
+            # V70: ترجم رسالة الخطأ للعربية إذا كانت ضمن القائمة المعروفة.
+            return {"error": _translate_g2bulk_error(data.get("error")), "raw": data}
         return data
     except Exception as exc:
         return {"error": str(exc)}

@@ -86,6 +86,7 @@
               <span class="status completed">مكتمل</span>
             {% elif o.status == 'rejected' %}
               <span class="status rejected">مرفوض</span>
+              {% if o.note %}<div class="muted" style="max-width:260px;white-space:normal">السبب: {{ o.note }}</div>{% endif %}
             {% else %}
               <span class="status pending">{{ o.status }}</span>
             {% endif %}
