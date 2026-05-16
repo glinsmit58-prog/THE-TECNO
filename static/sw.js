@@ -15,7 +15,7 @@
 //     #1 reason mobile users felt the site was slow.
 //   - Pre-cache the new V61 CSS + the home page so first paint after
 //     install is instant (and offline-friendly).
-const CACHE_VERSION = 'tg-v66-1';
+const CACHE_VERSION = 'tg-v67-3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGES_CACHE = `${CACHE_VERSION}-pages`;
 const OFFLINE_URL = '/';
@@ -24,7 +24,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) =>
       cache.addAll([
-        '/static/css/v60-neon.css?v=62',
+        '/static/css/v60-neon.css?v=68',
         '/static/css/v60-neon.css',
         '/static/js/app.min.js',
         '/static/js/pages/home.js',

@@ -35,9 +35,34 @@ function _tgResetSubmits() {
 window.addEventListener('pageshow', _tgResetSubmits);
 document.addEventListener('DOMContentLoaded', _tgResetSubmits);
 
-// Auto-dismiss flash alerts with close button
-document.addEventListener('DOMContentLoaded', function () {
+// Auto-dismiss flash alerts with close button.
+// V67.3:
+//   1. Bumped fade-out timer 6s -> 10s so the user has time to read the
+//      "تم استلام طلب الشحن" confirmation comfortably.
+//   2. Added bfcache safety: when the browser restores /wallet from the
+//      back/forward cache, the previous flash markup is still in the DOM,
+//      so we re-run the dismiss logic AND we honor `data-once="1"` to
+//      hide one-shot alerts (e.g. deposit confirmation) immediately on
+//      restore so they never re-appear when the user opens /wallet again.
+function _tgWireFlashAlerts() {
   document.querySelectorAll('.alert').forEach(function (el) {
+    if (el.dataset._tgWired === '1') return;
+    el.dataset._tgWired = '1';
+
+    // One-shot toasts (e.g. deposit confirmation): if we have already
+    // shown this exact toast in the current tab, hide it instantly.
+    var oneShot = el.querySelector('[data-once="1"]');
+    if (oneShot) {
+      try {
+        var key = 'tg_once_' + (oneShot.textContent || '').trim().slice(0, 120);
+        if (sessionStorage.getItem(key) === '1') {
+          el.remove();
+          return;
+        }
+        sessionStorage.setItem(key, '1');
+      } catch (e) { /* private mode: just continue */ }
+    }
+
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'alert-close';
@@ -48,8 +73,17 @@ document.addEventListener('DOMContentLoaded', function () {
       el.style.transition = 'opacity .4s';
       el.style.opacity = '0';
       setTimeout(function () { el.remove(); }, 400);
-    }, 6000);
+    }, 10000);
   });
+}
+document.addEventListener('DOMContentLoaded', _tgWireFlashAlerts);
+// bfcache restore: Safari/Chrome may show stale flashes again. Strip them.
+window.addEventListener('pageshow', function (e) {
+  if (e.persisted) {
+    document.querySelectorAll('.messages .alert').forEach(function (el) { el.remove(); });
+  } else {
+    _tgWireFlashAlerts();
+  }
 });
 
 // Faster game search using data-name attribute
