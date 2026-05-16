@@ -2415,3 +2415,62 @@ label {
   background: rgba(34, 211, 238, 0.22);
   transform: translateY(-1px);
 }
+
+
+/* ----------------------------------------------------------------------- */
+/* V71: Player-name validation button + result message on /checkout page.   */
+/* The button calls /api/validate-player and shows the player's display     */
+/* name (when the supplier returns one) before the user confirms purchase.  */
+/* ----------------------------------------------------------------------- */
+.player-validate-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.player-validate-btn {
+  align-self: flex-start;
+  padding: 0.45rem 0.95rem;
+  font-size: 0.88rem;
+  border-radius: 0.75rem;
+  background: rgba(34, 211, 238, 0.10);
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  color: var(--neon-2);
+  cursor: pointer;
+  transition: background-color .15s ease, transform .15s ease, border-color .15s ease;
+}
+.player-validate-btn:hover:not(:disabled) {
+  background: rgba(34, 211, 238, 0.20);
+  border-color: var(--neon-2);
+  transform: translateY(-1px);
+}
+.player-validate-btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.player-validate-result {
+  min-height: 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0;
+  border-radius: 0.6rem;
+  transition: background-color .15s ease, color .15s ease, padding .15s ease;
+}
+.player-validate-result.vp-ok {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.08);
+  border: 1px solid rgba(74, 222, 128, 0.30);
+  padding: 0.5rem 0.75rem;
+}
+.player-validate-result.vp-warn {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.30);
+  padding: 0.5rem 0.75rem;
+}
+.player-validate-result.vp-err {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.30);
+  padding: 0.5rem 0.75rem;
+}
