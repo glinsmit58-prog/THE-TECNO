@@ -51,7 +51,7 @@
                 </form>
                 <form method="post" action="{{ url_for('admin_deposit_action', deposit_id=d.id, action='reject') }}"
                       style="display:inline"
-                      onsubmit="return confirm('هل أنت متأكد من رفض هذا الطلب؟');">
+                      data-confirm="هل أنت متأكد من رفض هذا الطلب؟">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn danger" type="submit" style="min-width:110px">✖ رفض</button>
                 </form>
