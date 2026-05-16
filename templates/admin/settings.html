@@ -89,6 +89,11 @@
       إعادة الرصيد تلقائيًا عند فشل المزود (بدلًا من نقل الطلب لقائمة اليدوي)
     </label>
 
+    <label style="display:flex;gap:10px;align-items:center;margin-top:10px">
+      <input type="checkbox" name="player_validation_api_enabled" value="1" {% if player_validation_api_enabled_setting=="1" %}checked{% endif %} style="width:auto">
+      تفعيل التحقق من اسم اللاعب عبر API (يستهلك استدعاءات لدى المورد)
+    </label>
+
 
 
 
