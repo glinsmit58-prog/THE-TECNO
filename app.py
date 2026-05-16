@@ -2062,15 +2062,26 @@ def wallet():
 
         proof = "\n".join(proof_parts)
 
+        # V69: "ضمن المركز" وكل طريقة `requires_proof=0` لا تحتاج إيصالاً.
+        # المنطق القديم كان يفرض الإيصال على كل الطرق، ما تسبّب في رسائل
+        # متضاربة (تطلب الإيصال أحيانًا، تتجاهله أحيانًا).
+        try:
+            method_requires_proof = int(method.get("requires_proof", 1) or 0)
+        except Exception:
+            method_requires_proof = 1
+
         if amount <= 0:
             flash("أدخل مبلغًا صحيحًا", "danger")
             return redirect(url_for("wallet"))
         if not method:
             flash("طريقة الدفع غير صحيحة", "danger")
             return redirect(url_for("wallet"))
-        if len(proof) < 3:
+        if method_requires_proof and len(proof) < 3:
             flash("أرسل إثبات الدفع أو ارفع صورة الإيصال", "danger")
             return redirect(url_for("wallet"))
+        # عندما لا يحتاج الإيصال، اضمن وجود نص رمزي في الحقل ليستفيد منه الأدمن.
+        if not method_requires_proof and len(proof) < 3:
+            proof = f"تم الدفع ضمن المركز ({method.get('name', '')})".strip()
 
         rate = float(get_setting("usd_syp_rate", "15000") or 15000)
         if method.get("currency") == "SYP":
@@ -2088,21 +2099,21 @@ def wallet():
         dep = create_deposit(user["id"], amount, method_id, proof, amount_usd=amount_usd,
                              proof_filename=proof_filename_saved)
         if dep:
-            # V67.2: friendlier, more reassuring confirmation. We tell the
-            # user explicitly that the request was *received*, that it is
-            # *under review*, and give a clear CTA to track its status.
+            # V69: cleaner, polished confirmation. Class-based markup so the
+            # CSS controls the look (no more inline divs/styles), and the
+            # base layout will auto-dismiss it after 8s + clear bfcache
+            # restores so opening "شحن المحفظة" again no longer resurfaces
+            # the same toast.
             track_url = url_for("wallet_transactions")
             flash(Markup(
-                '<div style="display:flex;align-items:flex-start;gap:10px">'
-                '<span style="font-size:20px;line-height:1.2">✅</span>'
-                '<div>'
-                f'<strong>تم استلام طلب الشحن رقم {dep[1]} بنجاح.</strong> '
-                'طلبك الآن <strong>قيد المراجعة</strong> من قبل الإدارة، '
-                'وسيُضاف الرصيد إلى محفظتك فور الموافقة.'
-                '<div style="margin-top:6px;font-size:13px;opacity:.95">'
-                '🔎 لمتابعة حالة طلبك '
-                f'<a href="{track_url}" class="alert-link"><strong>اضغط هنا</strong></a>.'
-                '</div>'
+                '<div class="toast-row">'
+                '<span class="toast-icon" aria-hidden="true">✅</span>'
+                '<div class="toast-body">'
+                f'<div class="toast-title">تم استلام طلب الشحن رقم <strong>{dep[1]}</strong></div>'
+                '<div class="toast-text">طلبك الآن قيد المراجعة من قبل الإدارة، '
+                'وسيُضاف الرصيد إلى محفظتك فور الموافقة.</div>'
+                f'<a class="toast-cta" href="{track_url}">'
+                '🔎 متابعة حالة الطلب</a>'
                 '</div>'
                 '</div>'
             ), "success")
@@ -3200,7 +3211,9 @@ def admin_payment_method_edit(method_id):
             address=clean_plain_text(request.form.get("address", ""), max_len=200),
             instructions=clean_rich_text(request.form.get("instructions", ""), max_len=1500),
             active=bool(request.form.get("active")),
-            currency=clean_plain_text(request.form.get("currency", "USD"), max_len=10)
+            currency=clean_plain_text(request.form.get("currency", "USD"), max_len=10),
+            # V69: الأدمن يقرر إذا كانت الطريقة تحتاج إيصالاً.
+            requires_proof=bool(request.form.get("requires_proof")),
         )
         flash("تم تحديث طريقة الدفع", "success")
         return redirect(url_for("admin_payment_methods"))

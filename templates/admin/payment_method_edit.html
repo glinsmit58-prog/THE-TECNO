@@ -27,6 +27,15 @@
       مفعلة
     </label>
 
+    {# V69: بعض الطرق (مثل "ضمن المركز") لا تحتاج إيصالاً لأن الدفع وجاهي. #}
+    <label style="display:flex;gap:10px;align-items:center">
+      <input type="checkbox" name="requires_proof" value="1" {% if method.requires_proof %}checked{% endif %} style="width:auto">
+      تتطلب إيصال/إثبات دفع من المستخدم
+    </label>
+    <p class="muted" style="margin-top:-4px;font-size:13px">
+      أزل العلامة لطرق الدفع الوجاهية (مثل "ضمن المركز") لتفادي إجبار المستخدم على رفع إيصال.
+    </p>
+
     <button class="btn primary" type="submit" style="margin-top:18px;width:100%">حفظ</button>
   </form>
 </div>

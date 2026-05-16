@@ -135,9 +135,16 @@
   <main>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        <div class="messages">
+        {# V69: polished toast container — auto-dismiss after 8s, with a
+           manual close button. The script below also clears stray flashed
+           markup if the page is restored from the bfcache so opening the
+           wallet again does NOT resurface the same success message. #}
+        <div class="messages tg-flashes" id="tgFlashes">
           {% for category, message in messages %}
-            <div class="alert {{ category }}">{{ message }}</div>
+            <div class="alert {{ category }} tg-flash" role="status">
+              <div class="tg-flash-body">{{ message }}</div>
+              <button type="button" class="tg-flash-close" aria-label="إغلاق" data-close-flash>×</button>
+            </div>
           {% endfor %}
         </div>
       {% endif %}
@@ -258,6 +265,38 @@
       if ('serviceWorker' in navigator && location.protocol === 'https:'){
         navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
       }
+
+      // V69: Flash toasts — close button, auto-dismiss after 8s, and
+      // remove stale toasts when the browser restores the page from the
+      // back/forward cache (otherwise opening "شحن المحفظة" again would
+      // resurface the same green success message).
+      function tgDismissFlash(el){
+        if (!el || el._dismissing) return;
+        el._dismissing = true;
+        el.classList.add('is-leaving');
+        setTimeout(function(){ if (el.parentNode) el.parentNode.removeChild(el); }, 350);
+      }
+      function tgInitFlashes(){
+        var nodes = document.querySelectorAll('.tg-flash');
+        nodes.forEach(function(el){
+          var btn = el.querySelector('[data-close-flash]');
+          if (btn && !btn._wired) {
+            btn._wired = true;
+            btn.addEventListener('click', function(){ tgDismissFlash(el); });
+          }
+          if (!el._timer) {
+            el._timer = setTimeout(function(){ tgDismissFlash(el); }, 8000);
+          }
+        });
+      }
+      tgInitFlashes();
+      window.addEventListener('pageshow', function(ev){
+        // bfcache restore — old flash markup is still in the DOM. Drop it.
+        if (ev.persisted) {
+          var box = document.getElementById('tgFlashes');
+          if (box && box.parentNode) box.parentNode.removeChild(box);
+        }
+      });
     });
   </script>
 

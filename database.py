@@ -412,13 +412,20 @@ def _init_db_inner(conn):
         address TEXT NOT NULL DEFAULT '',
         instructions TEXT NOT NULL DEFAULT '',
         active INTEGER NOT NULL DEFAULT 1,
-        currency TEXT NOT NULL DEFAULT 'USD'
+        currency TEXT NOT NULL DEFAULT 'USD',
+        requires_proof INTEGER NOT NULL DEFAULT 1
     )
     """)
 
     # ترقية قواعد البيانات القديمة
     try:
         cur.execute("ALTER TABLE payment_methods ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD'")
+    except Exception:
+        pass
+    # V69: requires_proof — هل تتطلب طريقة الدفع إيصالاً/إثباتًا؟
+    # "ضمن المركز" مثلاً لا تحتاج إيصالاً لأن الدفع يتم وجاهيًا.
+    try:
+        cur.execute("ALTER TABLE payment_methods ADD COLUMN requires_proof INTEGER NOT NULL DEFAULT 1")
     except Exception:
         pass
     try:
@@ -473,18 +480,26 @@ def _init_db_inner(conn):
 
 
     default_methods = [
-        ("usdt", "USDT (TRC20)", "🪙", "ضع عنوان USDT هنا", "حوّل بالدولار إلى العنوان أدناه ثم أرسل إثبات الدفع.", "USD"),
-        ("binance", "Binance Pay", "💳", "ضع Binance ID هنا", "حوّل بالدولار عبر Binance Pay ثم أرسل إثبات الدفع.", "USD"),
-        ("sham_syr", "شام كاش سوري", "🇸🇾", "ضع رقم الحساب هنا", "حوّل بالليرة السورية ثم أرسل إثبات الدفع.", "SYP"),
-        ("sham_usd", "شام كاش دولار", "💵", "ضع رقم الحساب هنا", "حوّل بالدولار ثم أرسل إثبات الدفع.", "USD"),
-        ("syriatel", "سيرياتيل كاش", "📱", "ضع رقم الهاتف هنا", "حوّل بالليرة السورية فقط ثم أرسل إثبات الدفع.", "SYP"),
-        ("center", "ضمن المركز", "🏢", "عنوان المركز", "الدفع ضمن المركز بالليرة السورية فقط.", "SYP")
+        ("usdt", "USDT (TRC20)", "🪙", "ضع عنوان USDT هنا", "حوّل بالدولار إلى العنوان أدناه ثم أرسل إثبات الدفع.", "USD", 1),
+        ("binance", "Binance Pay", "💳", "ضع Binance ID هنا", "حوّل بالدولار عبر Binance Pay ثم أرسل إثبات الدفع.", "USD", 1),
+        ("sham_syr", "شام كاش سوري", "🇸🇾", "ضع رقم الحساب هنا", "حوّل بالليرة السورية ثم أرسل إثبات الدفع.", "SYP", 1),
+        ("sham_usd", "شام كاش دولار", "💵", "ضع رقم الحساب هنا", "حوّل بالدولار ثم أرسل إثبات الدفع.", "USD", 1),
+        ("syriatel", "سيرياتيل كاش", "📱", "ضع رقم الهاتف هنا", "حوّل بالليرة السورية فقط ثم أرسل إثبات الدفع.", "SYP", 1),
+        # V69: "ضمن المركز" يتم وجاهيًا، لا حاجة لإيصال إلكتروني.
+        ("center", "ضمن المركز", "🏢", "عنوان المركز", "الدفع ضمن المركز بالليرة السورية فقط — لا حاجة لإيصال.", "SYP", 0)
     ]
     for m in default_methods:
         cur.execute("""
-            INSERT OR IGNORE INTO payment_methods (id, name, emoji, address, instructions, active, currency)
-            VALUES (?, ?, ?, ?, ?, 1, ?)
+            INSERT OR IGNORE INTO payment_methods (id, name, emoji, address, instructions, active, currency, requires_proof)
+            VALUES (?, ?, ?, ?, ?, 1, ?, ?)
         """, m)
+
+    # V69: backfill existing deployments — make sure "ضمن المركز" is marked as
+    # not-requiring-proof even if the row was inserted before the column existed.
+    try:
+        cur.execute("UPDATE payment_methods SET requires_proof=0 WHERE id='center'")
+    except Exception:
+        pass
 
     cur.execute("INSERT OR IGNORE INTO settings (key,value) VALUES (?,?)", ("support_contact", "@support"))
     cur.execute("INSERT OR IGNORE INTO settings (key,value) VALUES (?,?)", ("usd_syp_rate", "15000"))
@@ -1355,7 +1370,7 @@ def get_payment_method(method_id):
         return dict(row) if row else None
 
 
-def update_payment_method(method_id, name=None, emoji=None, address=None, instructions=None, active=None, currency=None):
+def update_payment_method(method_id, name=None, emoji=None, address=None, instructions=None, active=None, currency=None, requires_proof=None):
     method = get_payment_method(method_id)
     if not method:
         return False
@@ -1365,11 +1380,19 @@ def update_payment_method(method_id, name=None, emoji=None, address=None, instru
     instructions = method["instructions"] if instructions is None else instructions
     active = method["active"] if active is None else (1 if active else 0)
     currency = method.get("currency", "USD") if currency is None else currency
+    # V69: requires_proof is opt-out per method (default 1).
+    if requires_proof is None:
+        try:
+            requires_proof = int(method.get("requires_proof", 1) or 0)
+        except Exception:
+            requires_proof = 1
+    else:
+        requires_proof = 1 if requires_proof else 0
     with db_conn() as conn:
         conn.execute("""
-            UPDATE payment_methods SET name=?, emoji=?, address=?, instructions=?, active=?, currency=?
+            UPDATE payment_methods SET name=?, emoji=?, address=?, instructions=?, active=?, currency=?, requires_proof=?
             WHERE id=?
-        """, (name, emoji, address, instructions, active, currency, method_id))
+        """, (name, emoji, address, instructions, active, currency, requires_proof, method_id))
         conn.commit()
     return True
 

@@ -24,7 +24,11 @@
         <label>{{ t("payment_method") }}</label>
         <select name="method_id" id="payment-method" required>
           {% for m in methods %}
-            <option value="{{ m.id }}" data-currency="{{ m.currency }}" data-address="{{ m.address }}" data-instructions="{{ m.instructions }}">{{ m.emoji }} {{ m.name }} — {{ "ليرة سورية" if m.currency=="SYP" else "دولار" }}</option>
+            <option value="{{ m.id }}"
+                    data-currency="{{ m.currency }}"
+                    data-address="{{ m.address }}"
+                    data-instructions="{{ m.instructions }}"
+                    data-requires-proof="{{ '1' if m.requires_proof else '0' }}">{{ m.emoji }} {{ m.name }} — {{ "ليرة سورية" if m.currency=="SYP" else "دولار" }}</option>
           {% endfor %}
         </select>
 
@@ -37,13 +41,28 @@
           <div id="method-instructions" class="muted" style="white-space:pre-wrap"></div>
         </div>
 
-        <label>رقم العملية أو ملاحظة</label>
-        <textarea name="proof" rows="3" maxlength="2000" placeholder="ضع رقم العملية أو أي تفاصيل تثبت الدفع"></textarea>
+        {# V69: حقول الإيصال داخل غلاف يمكن إخفاؤه إذا كانت طريقة الدفع
+           لا تحتاج إيصالاً (مثل "ضمن المركز"). #}
+        <div id="proof-fields">
+          <label>رقم العملية أو ملاحظة</label>
+          <textarea name="proof" rows="3" maxlength="2000" placeholder="ضع رقم العملية أو أي تفاصيل تثبت الدفع"></textarea>
 
-        <label>رفع صورة الإيصال</label>
-        <input class="file-input" type="file" name="proof_image" accept="image/*">
+          <label>رفع صورة الإيصال</label>
+          <input class="file-input" type="file" name="proof_image" accept="image/*">
+        </div>
 
-        <button class="btn primary" type="submit" style="margin-top:18px;width:100%">{{ t("submit_deposit") }}</button>
+        {# V69: شارة بديلة عندما لا يحتاج الإيصال — تطمئن المستخدم. #}
+        <div id="proof-not-required" class="payment-no-proof" style="display:none">
+          <span aria-hidden="true">🏢</span>
+          <div>
+            <b>هذه الطريقة لا تتطلب إيصالاً.</b>
+            <div class="muted" style="font-size:13px;margin-top:2px">
+              الدفع وجاهي ضمن المركز — يكفي إدخال المبلغ والإرسال.
+            </div>
+          </div>
+        </div>
+
+        <button class="btn primary js-deposit-submit" type="submit" style="margin-top:18px;width:100%">{{ t("submit_deposit") }}</button>
       </form>
       {% else %}
         <p class="muted">لا توجد طرق دفع مفعّلة حاليًا.</p>
@@ -61,8 +80,52 @@ function updatePaymentInfo(){
   document.getElementById('method-currency').innerText = cur === 'SYP' ? 'ليرة سورية' : 'دولار';
   document.getElementById('method-address').innerText = opt.dataset.address || '';
   document.getElementById('method-instructions').innerText = opt.dataset.instructions || '';
+
+  // V69: إخفاء حقول الإيصال للطرق التي لا تحتاج إثباتاً (مثل "ضمن المركز").
+  // كنا نطلب الإيصال دائماً، فأحياناً يقبله السيرفر وأحياناً يرفضه — هذا
+  // يوحّد السلوك ويمنع الالتباس.
+  const requiresProof = (opt.dataset.requiresProof || '1') !== '0';
+  const proofBox = document.getElementById('proof-fields');
+  const noProofBox = document.getElementById('proof-not-required');
+  if (proofBox)  proofBox.style.display  = requiresProof ? '' : 'none';
+  if (noProofBox) noProofBox.style.display = requiresProof ? 'none' : '';
+
+  // امسح حقول الإيصال إذا كانت الطريقة لا تحتاجها — تجنّبًا لإرسال مرفق
+  // غير ذي صلة بالخطأ.
+  if (!requiresProof) {
+    const txt = document.querySelector('#proof-fields textarea[name="proof"]');
+    const fil = document.querySelector('#proof-fields input[type="file"]');
+    if (txt) txt.value = '';
+    if (fil) fil.value = '';
+  }
 }
 document.addEventListener('DOMContentLoaded', updatePaymentInfo);
 document.addEventListener('change', (e)=>{ if(e.target && e.target.id==='payment-method') updatePaymentInfo(); });
+
+// V69: حماية من النقر المزدوج على زر الإرسال — كان النقر المتكرر يولّد
+// طلبَي شحن أو أكثر. نقفل الزر فور أول إرسال.
+(function(){
+  const form = document.getElementById('deposit');
+  if (!form) return;
+  form.addEventListener('submit', function(){
+    const btn = form.querySelector('.js-deposit-submit');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.dataset.label = btn.innerText;
+    btn.innerText = '… جاري الإرسال';
+    // إذا فشل الإرسال (مثلًا لأن المتصفح أعاد الصفحة من الـbfcache) نُعيد
+    // تفعيل الزر بعد 12 ثانية.
+    setTimeout(()=>{ btn.disabled = false; btn.innerText = btn.dataset.label || 'إرسال'; }, 12000);
+  });
+  // إعادة تهيئة الزر إذا رجع المستخدم بزر الرجوع.
+  window.addEventListener('pageshow', function(ev){
+    if (ev.persisted) {
+      const btn = form.querySelector('.js-deposit-submit');
+      if (btn) { btn.disabled = false; if (btn.dataset.label) btn.innerText = btn.dataset.label; }
+      form.reset();
+      updatePaymentInfo();
+    }
+  });
+})();
 </script>
 {% endblock %}
