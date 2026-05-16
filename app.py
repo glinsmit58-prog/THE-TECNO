@@ -1006,7 +1006,14 @@ def send_email_change_confirmation(to_email, token):
         button_url=link,
         footer_note="إذا لم تطلب تغيير البريد الإلكتروني، يمكنك تجاهل هذه الرسالة.",
     )
-    send_email(to_email, "TecnoGems - تأكيد تغيير البريد", body, html_body=html_body)
+    # V62.1 FIX (extended): send synchronously so SMTP errors surface to the
+    # caller in profile() instead of being silently swallowed by the background
+    # queue. The async send_email() path returned immediately and any SMTP
+    # failure happened later in a thread / RQ worker and never reached the
+    # user, so they always saw "تم الإرسال" even when the email never left.
+    if not email_is_configured():
+        raise RuntimeError("SMTP email settings are missing. Check .env")
+    _send_email_sync(to_email, "TecnoGems - تأكيد تغيير البريد", body, html_body=html_body)
 
 
 # V53: RQ is the only order queue backend. In-memory fallback removed —
