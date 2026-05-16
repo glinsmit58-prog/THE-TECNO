@@ -48,6 +48,42 @@
     </label>
     <p class="muted">عند التفعيل ستظهر أقسام مثل: شدات / بطاقات مباشرة في الصفحة الرئيسية بدل الدخول إلى اللعبة أولًا.</p>
 
+    {# V66: homepage section toggles #}
+    <h2>أقسام الصفحة الرئيسية</h2>
+
+    <label style="display:flex;gap:10px;align-items:center">
+      <input type="checkbox" name="show_popular_bar" value="1" {% if show_popular_bar_setting=="1" %}checked{% endif %} style="width:auto">
+      إظهار شريط "الأكثر طلباً" أعلى شبكة الألعاب
+    </label>
+    <p class="muted">شريط أفقي قابل للسحب يعرض أبرز 8 ألعاب مميّزة. يظهر فقط إذا اخترت 4 ألعاب أو أكثر للعرض.</p>
+
+    <label style="display:flex;gap:10px;align-items:center">
+      <input type="checkbox" name="show_testimonials" value="1" {% if show_testimonials_setting=="1" %}checked{% endif %} style="width:auto">
+      إظهار قسم "آراء اللاعبين" (التعليقات) في الصفحة الرئيسية
+    </label>
+    <p class="muted">عند الإطفاء يختفي القسم بالكامل. عند التشغيل يمكنك تخصيص محتوى كل تعليق أدناه.</p>
+
+    <div style="margin:14px 0 22px;padding:14px;background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.2);border-radius:12px">
+      <h3 style="margin:0 0 10px;font-size:15px">محتوى تعليقات الصفحة الرئيسية</h3>
+      <p class="muted" style="margin:0 0 12px;font-size:12px">اترك أي حقل فارغًا لاستخدام النص الافتراضي. الحقول تخزَّن كنص عادي ويتم تنظيف أي وسوم HTML تلقائيًا.</p>
+      {% for i in [1, 2, 3] %}
+        <fieldset style="border:1px solid #2a2a3a;border-radius:10px;padding:10px 12px;margin:0 0 10px">
+          <legend style="padding:0 6px;font-size:13px;color:#94a3b8">التعليق {{ i }}</legend>
+          <label>اسم اللاعب</label>
+          <input name="testimonial_{{ i }}_name" maxlength="80"
+                 value="{{ {1: testimonial_1_name, 2: testimonial_2_name, 3: testimonial_3_name}[i] }}"
+                 placeholder="مثال: أحمد ع.">
+          <label>اللعبة</label>
+          <input name="testimonial_{{ i }}_game" maxlength="60"
+                 value="{{ {1: testimonial_1_game, 2: testimonial_2_game, 3: testimonial_3_game}[i] }}"
+                 placeholder="مثال: PUBG">
+          <label>نص التعليق</label>
+          <textarea name="testimonial_{{ i }}_text" maxlength="400" rows="3"
+                    placeholder="اكتب نص التعليق هنا (يدعم العربية والإنجليزية)">{{ {1: testimonial_1_text, 2: testimonial_2_text, 3: testimonial_3_text}[i] }}</textarea>
+        </fieldset>
+      {% endfor %}
+    </div>
+
     <label style="display:flex;gap:10px;align-items:center">
       <input type="checkbox" name="auto_refund_on_failure" value="1" {% if auto_refund_on_failure_setting=="1" %}checked{% endif %} style="width:auto">
       إعادة الرصيد تلقائيًا عند فشل المزود (بدلًا من نقل الطلب لقائمة اليدوي)

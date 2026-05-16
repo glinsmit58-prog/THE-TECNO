@@ -1794,17 +1794,25 @@ def _resolve_poster_key(gk, available):
 
 
 def attach_generated_posters():
-    """For every game whose image_url is empty, attach the closest matching
-    poster from static/img/games/. Admin uploads are never overwritten.
+    """For every game whose image_url is empty (or points to a missing
+    file), attach the closest matching poster from static/img/games/.
 
     See `_resolve_poster_key` for the matching strategy (exact -> alias ->
     base-name fallback). Returns the number of rows updated.
 
     V65: posters can now be `.jpg` (new high-res artwork) or `.webp` (legacy
     thumbnails). JPG is preferred when both exist for the same game_key.
+
+    V66 SELF-HEAL: V65 replaced 125 webp posters with jpg files but the DB
+    still had the old `/static/img/games/<key>.webp` paths cached, so most
+    games rendered a broken image. We now also clear/refresh any
+    auto-generated `/static/img/games/...` URL whose target file no longer
+    exists on disk. Admin-uploaded URLs (everything that does NOT start with
+    `/static/img/games/`) are still left untouched.
     """
     import os as _os
-    poster_dir = _os.path.join(_os.path.dirname(__file__), "static", "img", "games")
+    static_root = _os.path.join(_os.path.dirname(__file__), "static")
+    poster_dir = _os.path.join(static_root, "img", "games")
     if not _os.path.isdir(poster_dir):
         return 0
     ext_map = {}
@@ -1816,18 +1824,44 @@ def attach_generated_posters():
     if not ext_map:
         return 0
     available = set(ext_map.keys())
+
+    def _is_auto_path_stale(image_url):
+        """True iff image_url is an auto-generated /static/img/games/... path
+        whose file is missing on disk. Admin uploads (other prefixes such as
+        /uploads/, /static/img/games/web/, http(s)://...) are never touched.
+        """
+        if not image_url:
+            return False
+        if not image_url.startswith("/static/img/games/"):
+            return False
+        # Subdirectories like /static/img/games/web/... are admin/web posters,
+        # not auto-attached covers — leave them alone.
+        rel = image_url[len("/static/img/games/"):]
+        if "/" in rel:
+            return False
+        # Build the on-disk path safely (no path traversal — rel has no slash).
+        on_disk = _os.path.join(poster_dir, rel)
+        return not _os.path.isfile(on_disk)
+
     with db_conn() as conn:
         cur = conn.cursor()
         rows = cur.execute("SELECT id, game_key, image_url FROM games").fetchall()
         updated = 0
         for r in rows:
-            if (r["image_url"] or "").strip():
+            current = (r["image_url"] or "").strip()
+            if current and not _is_auto_path_stale(current):
                 continue
             gk = (r["game_key"] or "").lower()
             match = _resolve_poster_key(gk, available)
             if match:
                 url = f"/static/img/games/{match}.{ext_map[match]}"
-                cur.execute("UPDATE games SET image_url=? WHERE id=?", (url, r["id"]))
+                if url != current:
+                    cur.execute("UPDATE games SET image_url=? WHERE id=?", (url, r["id"]))
+                    updated += 1
+            elif current:
+                # No replacement found for a stale auto path — clear it so the
+                # display layer can fall back to the smart SVG.
+                cur.execute("UPDATE games SET image_url='' WHERE id=?", (r["id"],))
                 updated += 1
         conn.commit()
     return updated
