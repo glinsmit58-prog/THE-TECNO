@@ -40,6 +40,7 @@ from flask import (
     session,
     url_for,
 )
+from markupsafe import Markup
 
 from app import (
     MAX_EMAIL_LEN,
@@ -143,10 +144,25 @@ def register():
             if verification_enabled:
                 try:
                     send_verification_email(email, token)
-                    flash(
-                        "تم إنشاء الحساب. أرسلنا رابط التفعيل إلى بريدك الإلكتروني.",
-                        "success",
-                    )
+                    # V67.2: clear, elegant confirmation that also tells the
+                    # user the link might land in Spam / Junk. We use Markup
+                    # so the hint can be visually distinct (icon + smaller
+                    # secondary line) without an extra template change.
+                    flash(Markup(
+                        '<div style="display:flex;align-items:flex-start;gap:10px">'
+                        '<span style="font-size:20px;line-height:1.2">📧</span>'
+                        '<div>'
+                        '<strong>تم إنشاء حسابك بنجاح.</strong> '
+                        'أرسلنا رابط التفعيل إلى بريدك الإلكتروني '
+                        f'<strong>{email}</strong>.'
+                        '<div style="margin-top:6px;font-size:13px;opacity:.9">'
+                        '💡 إن لم تجد الرسالة في صندوق الوارد خلال دقيقة، '
+                        'فمن فضلك تحقق من مجلّد '
+                        '<strong>الرسائل غير المرغوب فيها (Spam / Junk)</strong>.'
+                        '</div>'
+                        '</div>'
+                        '</div>'
+                    ), "success")
                 except Exception as exc:
                     log.warning("verification email failed for %s: %s", email, exc)
                     user = get_user_by_email(email)

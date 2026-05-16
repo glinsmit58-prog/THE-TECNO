@@ -10,7 +10,7 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <label>{{ t("name") }}</label>
-    <input name="name" id="reg-name" required maxlength="80" autocomplete="name" placeholder="{{ 'Your name' if is_en else 'الاسم الكامل' }}">
+    <input name="name" id="reg-name" type="text" required maxlength="80" autocomplete="name" placeholder="{{ 'Your name' if is_en else 'الاسم الكامل' }}">
     <span class="field-error" id="err-name"></span>
 
     <label style="margin-top:14px">{{ t("email") }}</label>

@@ -2072,12 +2072,23 @@ def wallet():
         dep = create_deposit(user["id"], amount, method_id, proof, amount_usd=amount_usd,
                              proof_filename=proof_filename_saved)
         if dep:
-            # V67: clearer confirmation with a clickable link to the
-            # top-up requests page so the user can track approval status.
+            # V67.2: friendlier, more reassuring confirmation. We tell the
+            # user explicitly that the request was *received*, that it is
+            # *under review*, and give a clear CTA to track its status.
             track_url = url_for("wallet_transactions")
             flash(Markup(
-                f'تم استلام طلب الشحن <strong>{dep[1]}</strong> وبانتظار موافقة الإدارة. '
-                f'لمتابعة حالة طلبك <a href="{track_url}" class="alert-link"><strong>اضغط هنا</strong></a>.'
+                '<div style="display:flex;align-items:flex-start;gap:10px">'
+                '<span style="font-size:20px;line-height:1.2">✅</span>'
+                '<div>'
+                f'<strong>تم استلام طلب الشحن رقم {dep[1]} بنجاح.</strong> '
+                'طلبك الآن <strong>قيد المراجعة</strong> من قبل الإدارة، '
+                'وسيُضاف الرصيد إلى محفظتك فور الموافقة.'
+                '<div style="margin-top:6px;font-size:13px;opacity:.95">'
+                '🔎 لمتابعة حالة طلبك '
+                f'<a href="{track_url}" class="alert-link"><strong>اضغط هنا</strong></a>.'
+                '</div>'
+                '</div>'
+                '</div>'
             ), "success")
         else:
             flash("فشل إرسال طلب الشحن", "danger")
@@ -2794,7 +2805,20 @@ def api_wallet():
     user = current_user()
     if not user:
         return jsonify({"ok": False, "error": "يجب تسجيل الدخول"}), 401
-    return jsonify({"ok": True, "balance": float(user["balance"] or 0), "methods": list_payment_methods(True)})
+    bal = float(user["balance"] or 0)
+    return jsonify({
+        "ok": True,
+        "balance": bal,
+        # V67.2: also send the *formatted* string so the navbar JS does not
+        # have to guess the currency / suffix. Without this the JS was
+        # replacing the leading number while keeping the old "ل.س" suffix,
+        # which produced "8.20 ل.س" for a USD value when display currency
+        # was SYP. Sending the rendered label keeps the navbar consistent
+        # with whatever wallet_money_text() decides on the server.
+        "balance_text": wallet_money_text(bal),
+        "display_currency": get_display_currency(),
+        "methods": list_payment_methods(True),
+    })
 
 
 @app.route("/games")
