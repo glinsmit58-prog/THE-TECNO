@@ -78,25 +78,40 @@ def send_email_task(
     smtp_use_tls: bool,
     mail_from: str,
     html_body: str = None,
+    mail_from_name: str = "TecnoGems",
+    reply_to: str = "",
 ):
     """Pure function — safe to enqueue. No app context needed."""
     # Build multipart message (plain + HTML) for better deliverability
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = formataddr(("TecnoGems", mail_from))
+    # V67 DELIVERABILITY: see app.py _send_email_sync for rationale.
+    msg["From"] = formataddr((mail_from_name or "TecnoGems", mail_from))
+    if smtp_user and smtp_user.lower() != (mail_from or "").lower():
+        msg["Sender"] = smtp_user
     msg["To"] = to_email
-    msg["Reply-To"] = mail_from
+    msg["Reply-To"] = reply_to or mail_from
     msg["Date"] = formatdate(localtime=True)
-    msg["Message-ID"] = make_msgid(domain=mail_from.split("@")[-1] if "@" in mail_from else "tecnogems.com")
-    msg["X-Mailer"] = "TecnoGems Mailer"
-    msg["Precedence"] = "bulk"
-    msg["List-Unsubscribe"] = f"<mailto:{mail_from}?subject=unsubscribe>"
+    _msgid_domain = mail_from.split("@")[-1] if "@" in (mail_from or "") else "tecnogems.com"
+    msg["Message-ID"] = make_msgid(domain=_msgid_domain)
+    # V67 DELIVERABILITY headers — DO NOT set Precedence:bulk or
+    # List-Unsubscribe (mailto-only) on transactional mail; both push
+    # account-verification messages into Spam at Gmail.
+    msg["X-Mailer"] = "TecnoGems Transactional Mailer"
+    msg["X-Auto-Response-Suppress"] = "All"
+    msg["Auto-Submitted"] = "auto-generated"
+    msg["X-Entity-Ref-ID"] = make_msgid(domain=_msgid_domain).strip("<>")
+    msg["MIME-Version"] = "1.0"
 
     part_text = MIMEText(body, "plain", "utf-8")
     msg.attach(part_text)
     if html_body:
         part_html = MIMEText(html_body, "html", "utf-8")
         msg.attach(part_html)
+
+    # V67 DELIVERABILITY: envelope sender MUST equal the authenticated
+    # mailbox for SPF alignment with Gmail / Workspace.
+    envelope_from = smtp_user if smtp_user and "@" in smtp_user else mail_from
 
     with smtplib.SMTP(smtp_server, smtp_port, timeout=30) as server:
         server.ehlo()
@@ -105,7 +120,7 @@ def send_email_task(
             server.ehlo()
         if smtp_user and smtp_password:
             server.login(smtp_user, smtp_password)
-        server.send_message(msg)
+        server.send_message(msg, from_addr=envelope_from, to_addrs=[to_email])
 
 
 # ---- Order processing task (RQ-callable) -------------------------------
