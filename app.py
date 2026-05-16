@@ -1501,11 +1501,33 @@ def server_error(e):
 def add_cache_headers(response):
     if request.path.startswith("/static/"):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-    elif request.path.startswith("/admin") or request.path.startswith("/login") or request.path.startswith("/register") or request.path.startswith("/forgot") or request.path.startswith("/reset") or request.method == "POST":
+    elif (
+        request.path.startswith("/admin")
+        or request.path.startswith("/login")
+        or request.path.startswith("/register")
+        or request.path.startswith("/forgot")
+        or request.path.startswith("/reset")
+        or request.method == "POST"
+    ):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
     else:
-        response.headers.setdefault("Cache-Control", "private, max-age=120")
+        # V67.1 BUGFIX: previously every public GET was cached for 120s with
+        # `private, max-age=120`. That cached the *logged-out* HTML (which
+        # shows "إنشاء حساب" in the navbar) for 2 minutes, so users saw the
+        # logged-out navbar for up to two minutes after signing in until they
+        # manually refreshed. It also held stale flashed messages and stale
+        # balance values.
+        # Fix: any request that has a logged-in user MUST NOT be cached. We
+        # also weaken the public cache to 30s (was 120) so sign-up impressions
+        # are quicker too. Static assets are unchanged (still 1 year).
+        if session.get("user_id"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Vary"] = "Cookie"
+        else:
+            response.headers.setdefault("Cache-Control", "private, max-age=30")
+            response.headers.setdefault("Vary", "Cookie")
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -2374,7 +2396,22 @@ def admin_dashboard():
 @admin_required
 def admin_orders():
     status = request.args.get("status")
-    return render_template("admin/orders.html", orders=list_orders(status), status=status)
+    # V67.1: filter by provider so the admin can focus on a single supplier
+    # at a time. Defaults to the configured primary_provider so the page
+    # opens straight to the operator's main supplier.
+    provider = (request.args.get("provider") or "").strip()
+    if provider not in ("server1", "server2", "all"):
+        provider = get_setting("primary_provider", "server2")
+    orders = list_orders(status)
+    if provider in ("server1", "server2"):
+        orders = [o for o in orders if (o.get("provider") or "") == provider]
+    return render_template(
+        "admin/orders.html",
+        orders=orders,
+        status=status,
+        active_provider=provider,
+        primary_provider=get_setting("primary_provider", "server2"),
+    )
 
 
 @app.route("/admin/order/<int:order_id>/<action>", methods=["POST"])
@@ -2390,7 +2427,11 @@ def admin_order_action(order_id, action):
     # change, from which status).
     admin = current_user()
     if action == "complete":
-        update_order(order_id, "completed", order.get("provider_order_id"), "Manual complete")
+        # V67.1: be explicit that this is a MANUAL completion (admin
+        # fulfilled the order outside the platform). Stamp the note so
+        # the user/admin can later tell apart auto-fulfilled vs. manual.
+        update_order(order_id, "completed", order.get("provider_order_id"),
+                     "تم الإكمال يدوياً من قبل الإدارة")
         # V52 (task D): structured audit row — replaces legacy log.warning.
         log_audit(
             "ADMIN_ORDER_COMPLETE",
@@ -2404,7 +2445,7 @@ def admin_order_action(order_id, action):
             new={"status": "completed"},
             metadata={"user_id": order.get("user_id")},
         )
-        flash("تم تعليم الطلب كمكتمل", "success")
+        flash("تم تعليم الطلب كمكتمل (يدوي)", "success")
     elif action == "reject":
         update_order(order_id, "rejected", None, "Manual reject")
         log_audit(
@@ -2420,6 +2461,38 @@ def admin_order_action(order_id, action):
             metadata={"user_id": order.get("user_id"), "amount": order.get("price")},
         )
         flash("تم رفض الطلب وإرجاع الرصيد", "warning")
+    elif action == "retry":
+        # V67.1: re-push to supplier. Useful when the first push failed
+        # (network / supplier outage / wrong product mapping that's now
+        # fixed). Resets status to 'waiting' and re-enqueues so the worker
+        # processes it on the next tick. Refunds are NOT issued here —
+        # the rejection path (with auto_refund) is the only path that
+        # ever returns balance.
+        if order.get("status") in ("completed",):
+            flash("لا يمكن إعادة محاولة طلب مكتمل بالفعل", "warning")
+            return redirect(url_for("admin_orders"))
+        update_order(order_id, "waiting", None,
+                     "إعادة إرسال إلى المورد بأمر من الإدارة")
+        try:
+            enqueue_order_job(order_id)
+        except Exception as exc:
+            log.exception("admin_order_action retry enqueue failed: %s", exc)
+            flash(f"تعذر إعادة الإرسال: {exc}", "danger")
+            return redirect(url_for("admin_orders"))
+        log_audit(
+            "ADMIN_ORDER_RETRY",
+            actor_id=(admin or {}).get("id"),
+            actor_email=(admin or {}).get("email"),
+            target_type="order",
+            target_id=order_id,
+            ip=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            old={"status": order.get("status")},
+            new={"status": "waiting"},
+            metadata={"user_id": order.get("user_id")},
+        )
+        flash("تم إعادة إرسال الطلب إلى المورد. سيتم تحديث الحالة بعد قليل.",
+              "success")
     else:
         abort(404)
     return redirect(url_for("admin_orders"))
@@ -3156,6 +3229,12 @@ def admin_settings():
         set_setting("manual_orders", "1" if request.form.get("manual_orders") else "0")
         set_setting("show_server1", "1" if request.form.get("show_server1") else "0")
         set_setting("show_server2", "1" if request.form.get("show_server2") else "0")
+        # V67.1: primary provider — used by admin filters & badges so the
+        # operator can clearly tell which orders/games are on which supplier.
+        _pp = (request.form.get("primary_provider") or "server2").strip()
+        if _pp not in ("server1", "server2"):
+            _pp = "server2"
+        set_setting("primary_provider", _pp)
         set_setting("email_verification_enabled", "1" if request.form.get("email_verification_enabled") else "0")
         set_setting("hide_phone_on_register", "1" if request.form.get("hide_phone_on_register") else "0")
         set_setting("site_theme", request.form.get("site_theme", "theme-aurora"))
@@ -3198,6 +3277,8 @@ def admin_settings():
         manual_orders=get_setting("manual_orders", "0"),
         show_server1=get_setting("show_server1", "1"),
         show_server2=get_setting("show_server2", "1"),
+        # V67.1 — primary provider for admin UI separation (badges, filters).
+        primary_provider_setting=get_setting("primary_provider", "server2"),
         email_verification_enabled=get_setting("email_verification_enabled", "0"),
         hide_phone_on_register=get_setting("hide_phone_on_register", "0"),
         email_is_configured=email_is_configured(),

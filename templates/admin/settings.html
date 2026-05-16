@@ -97,6 +97,35 @@
       جعل جميع طلبات الشراء يدوية
     </label>
 
+    <!-- V67.1 PROVIDER SEPARATION -->
+    <hr style="border-color:rgba(255,255,255,.08);margin:16px 0">
+    <h3 style="margin:6px 0 10px">إعدادات الموردين</h3>
+    <p class="muted" style="font-size:13px;margin:0 0 10px">
+      حدّد المورد الأساسي. سيظهر علم مميّز بجانب كل لعبة وطلب لتمييزه عن المورد الثاني،
+      وفلتر صفحة الطلبات يبدأ بإظهاره فقط.
+    </p>
+
+    <label style="display:block;margin-bottom:6px;font-weight:700">المورد الأساسي</label>
+    <select name="primary_provider" style="width:100%;max-width:360px">
+      <option value="server2" {% if primary_provider_setting=="server2" %}selected{% endif %}>
+        🟢 Shop2Topup (سيرفر 2) — موصى به
+      </option>
+      <option value="server1" {% if primary_provider_setting=="server1" %}selected{% endif %}>
+        🔵 G2Bulk (سيرفر 1)
+      </option>
+    </select>
+
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px">
+      <label style="display:flex;gap:8px;align-items:center">
+        <input type="checkbox" name="show_server1" value="1" {% if show_server1=="1" %}checked{% endif %} style="width:auto">
+        تفعيل المورد 1 (G2Bulk)
+      </label>
+      <label style="display:flex;gap:8px;align-items:center">
+        <input type="checkbox" name="show_server2" value="1" {% if show_server2=="1" %}checked{% endif %} style="width:auto">
+        تفعيل المورد 2 (Shop2Topup)
+      </label>
+    </div>
+
     <label style="display:flex;gap:10px;align-items:center">
       <input type="checkbox" name="email_verification_enabled" value="1" {% if email_verification_enabled=="1" %}checked{% endif %} style="width:auto">
       تفعيل تأكيد البريد الإلكتروني للمستخدمين الجدد
