@@ -20,8 +20,9 @@
 
     {# V65: "الأكثر طلباً" horizontal-scroll carousel — small design addition
        ported from neon-gaming-topup-updated/src/routes/index.tsx. Shows the
-       top featured games as a swipeable strip above the main grid. #}
-    {% if featured_games and featured_games|length >= 4 %}
+       top featured games as a swipeable strip above the main grid.
+       V66: now toggleable via admin setting `show_popular_bar` (default ON). #}
+    {% if show_popular_bar and featured_games and featured_games|length >= 4 %}
       <div class="v60-featured-row">
         <div class="v60-featured-row-head">
           <h3>

@@ -180,6 +180,9 @@
 </section>
 
 {# ═════════════════════ TESTIMONIALS ═════════════════════ #}
+{# V66: section can be hidden via admin setting `show_testimonials`,
+   and each card's name/game/text are editable from the admin panel. #}
+{% if show_testimonials %}
 <section class="v60-section" id="testimonials">
   <div class="v60-container">
     <div style="text-align:center;margin-bottom:3rem">
@@ -189,27 +192,19 @@
       </h2>
     </div>
     <div class="v60-testimonials-grid">
-      {% set _reviews = [
-        {"n": ("Ahmad A." if is_en else "أحمد ع."), "g":"PUBG",
-         "t": ("Fastest top-up I've ever used. UC arrived before I finished typing my email!" if is_en else "أسرع موقع شحن جربته. وصلتني الـUC قبل ما أكمل أكتب الإيميل!")},
-        {"n": ("Layth M." if is_en else "ليث م."), "g":"Free Fire",
-         "t": ("Great prices and the team replied in two minutes. My go-to site now." if is_en else "الأسعار ممتازة والدعم رد عليّ خلال دقيقتين. صار موقعي الثابت.")},
-        {"n": ("Sara K." if is_en else "سارة ك."), "g":"Genshin",
-         "t": ("Beautiful UI and easy checkout. Topped up from my phone in seconds." if is_en else "الواجهة جميلة جداً والدفع كان سهل. شحنت من الجوال بثوانٍ.")},
-      ] %}
-      {% for r in _reviews %}
+      {% for r in testimonials %}
         <div class="v60-testimonial">
           <div class="v60-testimonial-stars" aria-label="5 stars">
             {% for _ in range(5) %}
               <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>
             {% endfor %}
           </div>
-          <p class="v60-testimonial-text">"{{ r.t }}"</p>
+          <p class="v60-testimonial-text">"{{ r.text }}"</p>
           <div class="v60-testimonial-author">
-            <span class="v60-testimonial-avatar">{{ r.n[0] }}</span>
+            <span class="v60-testimonial-avatar">{{ r.name[0] if r.name else '?' }}</span>
             <div>
-              <div class="v60-testimonial-name">{{ r.n }}</div>
-              <div class="v60-testimonial-role">{{ ("Player" if is_en else "لاعب") ~ " " ~ r.g }}</div>
+              <div class="v60-testimonial-name">{{ r.name }}</div>
+              <div class="v60-testimonial-role">{{ ("Player" if is_en else "لاعب") ~ " " ~ r.game }}</div>
             </div>
           </div>
         </div>
@@ -217,6 +212,7 @@
     </div>
   </div>
 </section>
+{% endif %}
 
 {# ═════════════════════ CTA ═════════════════════ #}
 <section class="v60-section" id="cta">

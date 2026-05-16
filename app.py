@@ -1103,6 +1103,12 @@ def game_image_url(game):
     V64: Replaced old substring-matching (which caused wrong images) with
     precise game_key-based poster resolution using the same alias table and
     suffix-stripping logic as attach_generated_posters().
+
+    V66: Self-heal at display time. If the stored image_url points to a
+    file that was removed on disk (e.g. a `/static/img/games/<key>.webp`
+    that V65 replaced with `.jpg`), skip it and fall through to the live
+    resolver. Admin-uploaded URLs (anything not under /static/img/games/
+    top-level) and remote URLs are still trusted as-is.
     """
     try:
         name = str((game or {}).get("name") or (game or {}).get("game_name") or "")
@@ -1111,9 +1117,23 @@ def game_image_url(game):
     except Exception:
         name, key, custom = str(game or ""), "", ""
 
-    # 1. Admin-uploaded or DB-assigned image (highest priority)
+    # 1. Admin-uploaded or DB-assigned image (highest priority) — but only
+    #    if the file actually exists for auto-generated /static/img/games/<x>
+    #    paths; otherwise fall through to the live resolver below.
     if custom:
-        return custom
+        if custom.startswith("/static/img/games/"):
+            rel = custom[len("/static/img/games/"):]
+            if "/" not in rel:  # top-level auto poster
+                import os as _os
+                on_disk = _os.path.join(_os.path.dirname(__file__),
+                                        "static", "img", "games", rel)
+                if _os.path.isfile(on_disk):
+                    return custom
+                # else: fall through to resolver
+            else:
+                return custom
+        else:
+            return custom
 
     # 2. Match poster by game_key (precise, no substring false-positives)
     poster = _resolve_poster_for_display(key)
@@ -1594,12 +1614,48 @@ def home():
     else:
         featured = [g for g in games if g.get("product_count", 0) > 0][:8]
     has_more_games = len([g for g in games if g.get("product_count", 0) > 0]) > len(featured)
+    # V66: homepage section toggles + editable testimonial copy.
+    # Empty admin values fall back to the bilingual defaults below.
+    _t_defaults = [
+        {
+            "name_ar": "أحمد ع.", "name_en": "Ahmad A.",
+            "game": "PUBG",
+            "text_ar": "أسرع موقع شحن جربته. وصلتني الـUC قبل ما أكمل أكتب الإيميل!",
+            "text_en": "Fastest top-up I've ever used. UC arrived before I finished typing my email!",
+        },
+        {
+            "name_ar": "ليث م.", "name_en": "Layth M.",
+            "game": "Free Fire",
+            "text_ar": "الأسعار ممتازة والدعم رد عليّ خلال دقيقتين. صار موقعي الثابت.",
+            "text_en": "Great prices and the team replied in two minutes. My go-to site now.",
+        },
+        {
+            "name_ar": "سارة ك.", "name_en": "Sara K.",
+            "game": "Genshin",
+            "text_ar": "الواجهة جميلة جداً والدفع كان سهل. شحنت من الجوال بثوانٍ.",
+            "text_en": "Beautiful UI and easy checkout. Topped up from my phone in seconds.",
+        },
+    ]
+    is_en = current_lang() == "en"
+    testimonials = []
+    for i, d in enumerate(_t_defaults, start=1):
+        nm = (get_setting(f"testimonial_{i}_name", "") or "").strip()
+        gm = (get_setting(f"testimonial_{i}_game", "") or "").strip()
+        tx = (get_setting(f"testimonial_{i}_text", "") or "").strip()
+        testimonials.append({
+            "name": nm or (d["name_en"] if is_en else d["name_ar"]),
+            "game": gm or d["game"],
+            "text": tx or (d["text_en"] if is_en else d["text_ar"]),
+        })
     return render_template("home.html", games=games, home_groups=groups,
         featured_games=featured,
         has_more_games=has_more_games,
         recent_orders=recent_orders,
         games_count=len(games) + len(groups),
-        completed_orders_count=all_stats.get("completed", 0) if all_stats else 0)
+        completed_orders_count=all_stats.get("completed", 0) if all_stats else 0,
+        show_popular_bar=(get_setting("show_popular_bar", "1") == "1"),
+        show_testimonials=(get_setting("show_testimonials", "1") == "1"),
+        testimonials=testimonials)
 
 
 # ---------------------------------------------------------------------------
@@ -2922,6 +2978,16 @@ def admin_settings():
         # old_games_layout setting removed in V44.2 (single neon layout only)
         set_setting("manual_price_edit_enabled", "1" if request.form.get("manual_price_edit_enabled") else "0")
         set_setting("auto_refund_on_failure", "1" if request.form.get("auto_refund_on_failure") else "0")
+        # V66: homepage section toggles + editable testimonial copy.
+        set_setting("show_popular_bar", "1" if request.form.get("show_popular_bar") else "0")
+        set_setting("show_testimonials", "1" if request.form.get("show_testimonials") else "0")
+        for i in (1, 2, 3):
+            set_setting(f"testimonial_{i}_name",
+                        clean_plain_text(request.form.get(f"testimonial_{i}_name", ""), max_len=80))
+            set_setting(f"testimonial_{i}_game",
+                        clean_plain_text(request.form.get(f"testimonial_{i}_game", ""), max_len=60))
+            set_setting(f"testimonial_{i}_text",
+                        clean_plain_text(request.form.get(f"testimonial_{i}_text", ""), max_len=400))
         try:
             new_margin = float(request.form.get("profit_margin", "1.20"))
             try:
@@ -2955,6 +3021,18 @@ def admin_settings():
         show_groups_direct_setting=get_setting("show_groups_direct", "0"),
         old_games_layout_setting=get_setting("old_games_layout", "0"),
         auto_refund_on_failure_setting=get_setting("auto_refund_on_failure", "0"),
+        # V66: homepage section toggles + editable testimonial copy.
+        show_popular_bar_setting=get_setting("show_popular_bar", "1"),
+        show_testimonials_setting=get_setting("show_testimonials", "1"),
+        testimonial_1_name=get_setting("testimonial_1_name", ""),
+        testimonial_1_game=get_setting("testimonial_1_game", ""),
+        testimonial_1_text=get_setting("testimonial_1_text", ""),
+        testimonial_2_name=get_setting("testimonial_2_name", ""),
+        testimonial_2_game=get_setting("testimonial_2_game", ""),
+        testimonial_2_text=get_setting("testimonial_2_text", ""),
+        testimonial_3_name=get_setting("testimonial_3_name", ""),
+        testimonial_3_game=get_setting("testimonial_3_game", ""),
+        testimonial_3_text=get_setting("testimonial_3_text", ""),
         # SMTP diagnostics for the admin settings UI
         smtp_server=MAIL_SERVER,
         smtp_port=MAIL_PORT,
