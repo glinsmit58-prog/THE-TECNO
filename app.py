@@ -82,6 +82,13 @@ init_sentry()        # respects SENTRY_DSN env
 
 app = Flask(__name__)
 
+# V53.1: قراءة IP العميل الحقيقي خلف Cloudflare/Heroku.
+# يجب أن يُطبَّق ProxyFix قبل أي middleware آخر (Limiter, Compress, ...) كي
+# يرى remote_addr المُصحَّح. get_real_ip() يفضّل CF-Connecting-IP ثم
+# request.remote_addr بعد ProxyFix. تفاصيل الـenv vars في .env.example.
+from request_ip import apply_proxy_fix, get_real_ip
+apply_proxy_fix(app)
+
 _secret = os.getenv("SECRET_KEY", "")
 if not _secret or _secret == "dev-secret-change-me" or _secret == "change-this-secret-key":
     if os.getenv("FLASK_ENV") == "production":
@@ -211,7 +218,9 @@ if _redis_url:
 # Rate limiting
 try:
     from flask_limiter import Limiter
-    from flask_limiter.util import get_remote_address
+    # V53.1: استخدمنا get_real_ip بدل get_remote_address لقراءة IP العميل
+    # الحقيقي خلف Cloudflare/Heroku. بدون هذا، كل العملاء يشاركون نفس
+    # rate-limit bucket عبر IP الـproxy.
     # V50.2 MEDIUM: when REDIS_URL is set, use the Redis storage backend so
     # rate limits are shared across gunicorn workers and survive restarts.
     # Falls back to in-memory when Redis is unavailable (dev or single-process).
@@ -219,7 +228,7 @@ try:
     if _redis_url:
         _limiter_kwargs["storage_uri"] = _redis_url
         _limiter_kwargs["strategy"] = "fixed-window"
-    limiter = Limiter(get_remote_address, **_limiter_kwargs)
+    limiter = Limiter(get_real_ip, **_limiter_kwargs)
     if _redis_url:
         log.info("Flask-Limiter using Redis storage backend.")
     else:
@@ -2335,7 +2344,7 @@ def admin_2fa_confirm():
             actor_email=user["email"],
             target_type="user",
             target_id=user["id"],
-            ip=request.remote_addr,
+            ip=get_real_ip(),
             user_agent=request.headers.get("User-Agent"),
         )
         flash("الرمز غير صحيح أو انتهت صلاحيته. حاول مرة أخرى.", "danger")
@@ -2349,7 +2358,7 @@ def admin_2fa_confirm():
         actor_email=user["email"],
         target_type="user",
         target_id=user["id"],
-        ip=request.remote_addr,
+        ip=get_real_ip(),
         user_agent=request.headers.get("User-Agent"),
     )
     # Show backup codes ONCE. No way to retrieve them later — only regenerate.
@@ -2388,7 +2397,7 @@ def admin_2fa_challenge():
                 actor_email=user["email"],
                 target_type="user",
                 target_id=user["id"],
-                ip=request.remote_addr,
+                ip=get_real_ip(),
                 user_agent=request.headers.get("User-Agent"),
                 metadata={"method": "totp"},
                 level="info",
@@ -2406,7 +2415,7 @@ def admin_2fa_challenge():
                 actor_email=user["email"],
                 target_type="user",
                 target_id=user["id"],
-                ip=request.remote_addr,
+                ip=get_real_ip(),
                 user_agent=request.headers.get("User-Agent"),
                 metadata={"method": "backup_code", "remaining": len(remaining)},
             )
@@ -2419,7 +2428,7 @@ def admin_2fa_challenge():
             actor_email=user["email"],
             target_type="user",
             target_id=user["id"],
-            ip=request.remote_addr,
+            ip=get_real_ip(),
             user_agent=request.headers.get("User-Agent"),
         )
         flash("الرمز غير صحيح. حاول مرة أخرى.", "danger")
@@ -2455,7 +2464,7 @@ def admin_2fa_disable():
             actor_email=user["email"],
             target_type="user",
             target_id=user["id"],
-            ip=request.remote_addr,
+            ip=get_real_ip(),
             user_agent=request.headers.get("User-Agent"),
         )
         flash("كلمة المرور غير صحيحة.", "danger")
@@ -2472,7 +2481,7 @@ def admin_2fa_disable():
             actor_email=user["email"],
             target_type="user",
             target_id=user["id"],
-            ip=request.remote_addr,
+            ip=get_real_ip(),
             user_agent=request.headers.get("User-Agent"),
         )
         flash("رمز المصادقة غير صحيح.", "danger")
@@ -2485,7 +2494,7 @@ def admin_2fa_disable():
         actor_email=user["email"],
         target_type="user",
         target_id=user["id"],
-        ip=request.remote_addr,
+        ip=get_real_ip(),
         user_agent=request.headers.get("User-Agent"),
     )
     flash("تم إلغاء المصادقة الثنائية. يُنصح بإعادة تفعيلها.", "warning")
@@ -2510,7 +2519,7 @@ def admin_2fa_regenerate_backup_codes():
             actor_email=user["email"],
             target_type="user",
             target_id=user["id"],
-            ip=request.remote_addr,
+            ip=get_real_ip(),
             user_agent=request.headers.get("User-Agent"),
         )
         flash("رمز المصادقة غير صحيح.", "danger")
@@ -2523,7 +2532,7 @@ def admin_2fa_regenerate_backup_codes():
         actor_email=user["email"],
         target_type="user",
         target_id=user["id"],
-        ip=request.remote_addr,
+        ip=get_real_ip(),
         user_agent=request.headers.get("User-Agent"),
     )
     return render_template(
@@ -2598,7 +2607,7 @@ def admin_order_action(order_id, action):
             actor_email=(admin or {}).get("email"),
             target_type="order",
             target_id=order_id,
-            ip=request.remote_addr,
+            ip=get_real_ip(),
             user_agent=request.headers.get("User-Agent"),
             old={"status": order.get("status")},
             new={"status": "completed"},
@@ -2622,7 +2631,7 @@ def admin_order_action(order_id, action):
             actor_email=(admin or {}).get("email"),
             target_type="order",
             target_id=order_id,
-            ip=request.remote_addr,
+            ip=get_real_ip(),
             user_agent=request.headers.get("User-Agent"),
             old={"status": order.get("status")},
             new={"status": "rejected"},
@@ -2662,7 +2671,7 @@ def admin_order_action(order_id, action):
             actor_email=(admin or {}).get("email"),
             target_type="order",
             target_id=order_id,
-            ip=request.remote_addr,
+            ip=get_real_ip(),
             user_agent=request.headers.get("User-Agent"),
             old={"status": order.get("status")},
             new={"status": "waiting"},
@@ -2743,7 +2752,7 @@ def admin_user_balance(user_id):
         actor_email=(admin or {}).get("email"),
         target_type="user",
         target_id=user_id,
-        ip=request.remote_addr,
+        ip=get_real_ip(),
         user_agent=request.headers.get("User-Agent"),
         old={"balance": old_balance},
         new={"balance": new_balance},
@@ -2853,13 +2862,13 @@ def api_login():
     password = data.get("password") or ""
     # V50 SECURITY (HD): oversized inputs rejected pre-hash.
     if len(password) > MAX_PASSWORD_LEN or len(email) > MAX_EMAIL_LEN:
-        log.warning("Rejected oversized api_login inputs from %s", request.remote_addr)
+        log.warning("Rejected oversized api_login inputs from %s", get_real_ip())
         return jsonify({"ok": False, "error": "بيانات الدخول غير صحيحة"}), 401
     user = authenticate(email, password)
     if not user:
         # V50 SECURITY (M10): log failed API auth attempts.
         log.warning("Failed api_login for email=%s from ip=%s",
-                    email, request.remote_addr)
+                    email, get_real_ip())
         return jsonify({"ok": False, "error": "بيانات الدخول غير صحيحة"}), 401
     if email_verification_is_enabled() and user["role"] != "admin" and not user.get("email_verified"):
         return jsonify({"ok": False, "error": "يجب تفعيل بريدك الإلكتروني قبل تسجيل الدخول"}), 403
@@ -3098,7 +3107,7 @@ def admin_add_game():
             actor_email=(admin or {}).get("email"),
             target_type="game",
             target_id=f"{provider}:{game_key}",
-            ip=request.remote_addr,
+            ip=get_real_ip(),
             user_agent=request.headers.get("User-Agent"),
             new={"provider": provider, "game_key": game_key, "name": name},
         )
@@ -3162,7 +3171,7 @@ def admin_game_image(provider, game_key):
             actor_email=(admin or {}).get("email"),
             target_type="game",
             target_id=f"{provider}:{game_key}",
-            ip=request.remote_addr,
+            ip=get_real_ip(),
             user_agent=request.headers.get("User-Agent"),
             new={"image_url": image_url},
         )
@@ -3296,7 +3305,7 @@ def admin_deposit_action(deposit_id, action):
             actor_email=(admin or {}).get("email"),
             target_type="deposit",
             target_id=deposit_id,
-            ip=request.remote_addr,
+            ip=get_real_ip(),
             user_agent=request.headers.get("User-Agent"),
             old={"status": deposit.get("status")},
             new={"status": "approved"},
@@ -3313,7 +3322,7 @@ def admin_deposit_action(deposit_id, action):
         log.warning(
             "ADMIN_DEPOSIT_APPROVE admin_id=%s admin_email=%s deposit_id=%s ok=%s ip=%s",
             (admin or {}).get("id"), (admin or {}).get("email"),
-            deposit_id, ok, request.remote_addr,
+            deposit_id, ok, get_real_ip(),
         )
         flash("تمت الموافقة وإضافة الرصيد" if ok else "لا يمكن تعديل هذا الطلب", "success" if ok else "warning")
     elif action == "reject":
@@ -3324,7 +3333,7 @@ def admin_deposit_action(deposit_id, action):
             actor_email=(admin or {}).get("email"),
             target_type="deposit",
             target_id=deposit_id,
-            ip=request.remote_addr,
+            ip=get_real_ip(),
             user_agent=request.headers.get("User-Agent"),
             old={"status": deposit.get("status")},
             new={"status": "rejected"},
@@ -3341,7 +3350,7 @@ def admin_deposit_action(deposit_id, action):
         log.warning(
             "ADMIN_DEPOSIT_REJECT admin_id=%s admin_email=%s deposit_id=%s ok=%s ip=%s",
             (admin or {}).get("id"), (admin or {}).get("email"),
-            deposit_id, ok, request.remote_addr,
+            deposit_id, ok, get_real_ip(),
         )
         flash("تم رفض طلب الشحن" if ok else "لا يمكن تعديل هذا الطلب", "warning")
     else:
@@ -3675,7 +3684,7 @@ def _api_origin_guard():
             if p.netloc != host:
                 log.warning(
                     "API_ORIGIN_BLOCK path=%s origin=%s referer=%s host=%s ip=%s",
-                    request.path, origin, referer, host, request.remote_addr,
+                    request.path, origin, referer, host, get_real_ip(),
                 )
                 return jsonify({"error": "cross-origin request rejected"}), 403
     except Exception as exc:
