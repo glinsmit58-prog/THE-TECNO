@@ -41,8 +41,7 @@
     <label class="checkout-field-label" for="player_id">{{ t("player_id") }}</label>
     <div class="checkout-id-wrap">
       <input class="checkout-id-input" name="player_id" id="player_id" required minlength="3" maxlength="64"
-             placeholder="{{ t('example_id') }}" autocomplete="off" inputmode="numeric"
-             oninput="clearPlayerErr()">
+             placeholder="{{ t('example_id') }}" autocomplete="off" inputmode="numeric">
     </div>
     <span class="field-error" id="err-player-id"></span>
     <p class="muted checkout-id-hint">
@@ -60,6 +59,8 @@ function clearPlayerErr() {
   document.getElementById('err-player-id').textContent = '';
   document.getElementById('player_id').classList.remove('input-err');
 }
+// V70 CSP: bind input listener via JS instead of an inline attribute.
+document.getElementById('player_id').addEventListener('input', clearPlayerErr);
 document.getElementById('checkout-form').addEventListener('submit', function(e) {
   var pid = document.getElementById('player_id').value.trim();
   if (pid.length < 3) {

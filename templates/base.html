@@ -30,11 +30,15 @@
      400 for body), display=swap so first paint never waits on the font. #}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  {# V70 CSP: drop inline `onload` on the font link (blocked under strict
+     script-src 'self' 'nonce-...'). The plain stylesheet link is fine —
+     the browser already streams Cairo without blocking first paint thanks
+     to display=swap on the @font-face declarations, and the preload hint
+     above keeps the request in the critical chain. #}
   <link rel="preload" as="style"
         href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap">
   <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap"
-        media="print" onload="this.media='all';this.onload=null">
+        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap"></noscript>
 
   {# V60: single neon stylesheet — ports the game-charger-hub design.
@@ -223,6 +227,12 @@
           if (e.target === this) this.style.display = 'none';
         });
       }
+      var logoutCancel = document.getElementById('logout-cancel-btn');
+      if (logoutCancel && modal) {
+        logoutCancel.addEventListener('click', function(){
+          modal.style.display = 'none';
+        });
+      }
 
       // Back to top + sticky shadow — V61 perf: throttle with rAF and
       // only mutate the DOM when the boolean state actually changes. The
@@ -254,6 +264,21 @@
       applyState();
       if (top) top.addEventListener('click', function(){ window.scrollTo({ top: 0, behavior: 'smooth' }); });
 
+      // V70 CSP: generic confirm() shim. Templates set
+      //   <form data-confirm="..."> or <button data-confirm="...">
+      // instead of inline submit/click confirm handlers (blocked by
+      // strict script-src).
+      document.querySelectorAll('form[data-confirm]').forEach(function(f){
+        f.addEventListener('submit', function(e){
+          if (!window.confirm(f.dataset.confirm)) e.preventDefault();
+        });
+      });
+      document.querySelectorAll('button[data-confirm], a[data-confirm]').forEach(function(el){
+        el.addEventListener('click', function(e){
+          if (!window.confirm(el.dataset.confirm)) e.preventDefault();
+        });
+      });
+
       // Service worker
       if ('serviceWorker' in navigator && location.protocol === 'https:'){
         navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
@@ -271,7 +296,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn primary" type="submit">{{ "Yes, sign out" if is_en else "نعم، خروج" }}</button>
         </form>
-        <button type="button" class="btn" onclick="document.getElementById('logout-modal').style.display='none'">{{ "Cancel" if is_en else "إلغاء" }}</button>
+        <button type="button" class="btn" id="logout-cancel-btn">{{ "Cancel" if is_en else "إلغاء" }}</button>
       </div>
     </div>
   </div>

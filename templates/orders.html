@@ -4,11 +4,11 @@
   <div class="orders-header">
     <h1>{{ t("my_orders") }}</h1>
     <div class="orders-filter" id="orders-filter">
-      <button class="filter-btn active" data-filter="all" onclick="filterOrders('all',this)">{{ "All" if is_en else "الكل" }}</button>
-      <button class="filter-btn" data-filter="waiting" onclick="filterOrders('waiting',this)">⏳ {{ t("waiting") }}</button>
-      <button class="filter-btn" data-filter="processing" onclick="filterOrders('processing',this)">🔄 {{ t("processing") }}</button>
-      <button class="filter-btn" data-filter="completed" onclick="filterOrders('completed',this)">✅ {{ t("completed") }}</button>
-      <button class="filter-btn" data-filter="rejected" onclick="filterOrders('rejected',this)">❌ {{ t("rejected") }}</button>
+      <button class="filter-btn active" data-filter="all">{{ "All" if is_en else "الكل" }}</button>
+      <button class="filter-btn" data-filter="waiting">⏳ {{ t("waiting") }}</button>
+      <button class="filter-btn" data-filter="processing">🔄 {{ t("processing") }}</button>
+      <button class="filter-btn" data-filter="completed">✅ {{ t("completed") }}</button>
+      <button class="filter-btn" data-filter="rejected">❌ {{ t("rejected") }}</button>
     </div>
   </div>
 
@@ -41,7 +41,7 @@
         <div class="order-meta">
           <span class="order-code-wrap">
             <code class="order-code" id="oc-{{ o.id }}">{{ o.order_code }}</code>
-            <button class="copy-btn" onclick="copyCode('{{ o.order_code }}','{{ o.id }}')" title="{{ 'Copy order code' if is_en else 'نسخ رقم الطلب' }}">
+            <button class="copy-btn" data-code="{{ o.order_code }}" data-id="{{ o.id }}" title="{{ 'Copy order code' if is_en else 'نسخ رقم الطلب' }}">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             </button>
           </span>

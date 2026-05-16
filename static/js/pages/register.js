@@ -1,10 +1,20 @@
 function togglePw(inputId, showId, hideId) {
   var inp = document.getElementById(inputId);
+  if (!inp) return;
   var isHidden = inp.type === 'password';
   inp.type = isHidden ? 'text' : 'password';
-  document.getElementById(showId).style.display = isHidden ? 'none' : '';
-  document.getElementById(hideId).style.display = isHidden ? '' : 'none';
+  var show = document.getElementById(showId);
+  var hide = document.getElementById(hideId);
+  if (show) show.style.display = isHidden ? 'none' : '';
+  if (hide) hide.style.display = isHidden ? '' : 'none';
 }
+
+// V70 CSP: bind .pw-toggle buttons via data-* instead of inline onclick.
+document.querySelectorAll('.pw-toggle[data-pw-target]').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    togglePw(btn.dataset.pwTarget, btn.dataset.showId, btn.dataset.hideId);
+  });
+});
 
 // Password strength
 var pwInput = document.getElementById('reg-password');

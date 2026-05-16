@@ -43,7 +43,7 @@
               <td><input name="group_sort_order" type="number" value="{{ g.sort_order or 1 }}" style="width:90px"></td>
               <td><input type="checkbox" name="group_active" value="1" {% if g.active %}checked{% endif %}></td>
               <td><button class="btn small" name="action" value="update_group" type="submit">حفظ</button></td>
-              <td><button class="btn small danger" name="action" value="delete_group" type="submit" onclick="return confirm('حذف القسم؟ سيتم إرجاع باقاتها إلى عام.')">حذف</button></td>
+              <td><button class="btn small danger" name="action" value="delete_group" type="submit" data-confirm="حذف القسم؟ سيتم إرجاع باقاتها إلى عام.">حذف</button></td>
             </form>
           </tr>
         {% endfor %}

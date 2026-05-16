@@ -119,12 +119,12 @@
                 </form>
               {% endif %}
               <form method="post" action="{{ url_for('admin_order_action', order_id=o.id, action='complete') }}" style="display:inline"
-                    onsubmit="return confirm('تأكيد إكمال الطلب {{ o.order_code }} يدوياً؟');">
+                    data-confirm="تأكيد إكمال الطلب {{ o.order_code }} يدوياً؟">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn success" type="submit">إكمال يدوي</button>
               </form>
               <form method="post" action="{{ url_for('admin_order_action', order_id=o.id, action='reject') }}" style="display:inline"
-                    onsubmit="return confirm('تأكيد رفض الطلب {{ o.order_code }} وإرجاع الرصيد للمستخدم؟');">
+                    data-confirm="تأكيد رفض الطلب {{ o.order_code }} وإرجاع الرصيد للمستخدم؟">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn danger" type="submit">رفض</button>
               </form>
