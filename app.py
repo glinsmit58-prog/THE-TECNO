@@ -2540,11 +2540,19 @@ def admin_order_action(order_id, action):
     # admin account leaves a paper trail (who, from where, which order, what
     # change, from which status).
     admin = current_user()
+    # V69.1: حماية ضد ضغطات مزدوجة بعد التنفيذ — الطلبات النهائية لا
+    # تقبل تعديلاً جديداً. الواجهة تخفي الأزرار، لكن نحرس السيرفر أيضاً.
+    if order.get("status") in ("completed", "rejected") and action in ("complete", "reject"):
+        flash(
+            f"الطلب {order.get('order_code')} في حالة نهائية ({order.get('status')}) — لا يمكن تعديله.",
+            "warning",
+        )
+        return redirect(url_for("admin_orders"))
     if action == "complete":
         # V67.1: be explicit that this is a MANUAL completion (admin
         # fulfilled the order outside the platform). Stamp the note so
         # the user/admin can later tell apart auto-fulfilled vs. manual.
-        update_order(order_id, "completed", order.get("provider_order_id"),
+        ok = update_order(order_id, "completed", order.get("provider_order_id"),
                      "تم الإكمال يدوياً من قبل الإدارة")
         # V52 (task D): structured audit row — replaces legacy log.warning.
         log_audit(
@@ -2559,9 +2567,18 @@ def admin_order_action(order_id, action):
             new={"status": "completed"},
             metadata={"user_id": order.get("user_id")},
         )
-        flash("تم تعليم الطلب كمكتمل (يدوي)", "success")
+        if ok:
+            flash(
+                f"✅ تم إكمال الطلب {order.get('order_code')} يدوياً بنجاح.",
+                "success",
+            )
+        else:
+            flash(
+                f"تعذّر تعديل الطلب {order.get('order_code')} (تمت معالجته مسبقاً).",
+                "warning",
+            )
     elif action == "reject":
-        update_order(order_id, "rejected", None, "Manual reject")
+        ok = update_order(order_id, "rejected", None, "Manual reject")
         log_audit(
             "ADMIN_ORDER_REJECT",
             actor_id=(admin or {}).get("id"),
@@ -2574,7 +2591,16 @@ def admin_order_action(order_id, action):
             new={"status": "rejected"},
             metadata={"user_id": order.get("user_id"), "amount": order.get("price")},
         )
-        flash("تم رفض الطلب وإرجاع الرصيد", "warning")
+        if ok:
+            flash(
+                f"❌ تم رفض الطلب {order.get('order_code')} وإرجاع الرصيد للمستخدم.",
+                "warning",
+            )
+        else:
+            flash(
+                f"تعذّر تعديل الطلب {order.get('order_code')} (تمت معالجته مسبقاً).",
+                "warning",
+            )
     elif action == "retry":
         # V67.1: re-push to supplier. Useful when the first push failed
         # (network / supplier outage / wrong product mapping that's now

@@ -84,6 +84,7 @@
               {% if o.note %}<div class="muted" style="max-width:260px;white-space:normal">آخر تحديث: {{ o.note }}</div>{% endif %}
             {% elif o.status == 'completed' %}
               <span class="status completed">مكتمل</span>
+              {% if o.note %}<div class="muted" style="max-width:260px;white-space:normal;font-size:11px;margin-top:4px">{{ o.note }}</div>{% endif %}
             {% elif o.status == 'rejected' %}
               <span class="status rejected">مرفوض</span>
               {% if o.note %}<div class="muted" style="max-width:260px;white-space:normal">السبب: {{ o.note }}</div>{% endif %}
@@ -92,23 +93,42 @@
             {% endif %}
           </td>
           <td style="white-space:nowrap">
-            {# V67.1: Retry pushes the order back to the supplier — useful
-               when manual_pending was set because of a transient supplier
-               failure (network, rate-limit, wrong product mapping). #}
-            {% if o.status in ('manual_pending', 'rejected', 'waiting', 'supplier_pending') %}
-              <form method="post" action="{{ url_for('admin_order_action', order_id=o.id, action='retry') }}" style="display:inline">
+            {# V69.1: لا تُعرض أزرار "إكمال يدوي" / "رفض" إلا للطلبات
+               النشطة (التي ما تزال قابلة للمعالجة). الطلبات المكتملة
+               أو المرفوضة هي حالات نهائية:
+                 - completed: المنتج سُلِّم — لا يُسمح بالرفض/الاسترداد
+                   (لو سُمح به سيُعيد رصيد المستخدم رغم تسلّم المنتج).
+                 - rejected:  الرصيد أُعيد للمستخدم بالفعل — تكرار
+                   الرفض ينتج عنه استرداد مزدوج (انظر update_order).
+               الزر الوحيد المسموح به في الحالات النهائية هو "إعادة
+               المحاولة" لـ rejected عندما يريد الأدمن إعادة الإرسال
+               للمورد، لكن ذلك يتطلّب خصم الرصيد مجدّداً (غير مدعوم
+               حالياً) فلذلك أُخفي أيضاً. النتيجة: بعد القبول/الرفض
+               يصبح العمود "—" تماماً كما يطلب المستخدم. #}
+            {% set is_final = o.status in ('completed', 'rejected') %}
+            {% if is_final %}
+              <span class="muted">—</span>
+            {% else %}
+              {# V67.1: Retry pushes the order back to the supplier — useful
+                 when manual_pending was set because of a transient supplier
+                 failure (network, rate-limit, wrong product mapping). #}
+              {% if o.status in ('manual_pending', 'waiting', 'supplier_pending') %}
+                <form method="post" action="{{ url_for('admin_order_action', order_id=o.id, action='retry') }}" style="display:inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn" type="submit" title="إعادة الإرسال إلى المورد">🔁 إعادة المحاولة</button>
+                </form>
+              {% endif %}
+              <form method="post" action="{{ url_for('admin_order_action', order_id=o.id, action='complete') }}" style="display:inline"
+                    onsubmit="return confirm('تأكيد إكمال الطلب {{ o.order_code }} يدوياً؟');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button class="btn" type="submit" title="إعادة الإرسال إلى المورد">🔁 إعادة المحاولة</button>
+                <button class="btn success" type="submit">إكمال يدوي</button>
+              </form>
+              <form method="post" action="{{ url_for('admin_order_action', order_id=o.id, action='reject') }}" style="display:inline"
+                    onsubmit="return confirm('تأكيد رفض الطلب {{ o.order_code }} وإرجاع الرصيد للمستخدم؟');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn danger" type="submit">رفض</button>
               </form>
             {% endif %}
-            <form method="post" action="{{ url_for('admin_order_action', order_id=o.id, action='complete') }}" style="display:inline">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn success" type="submit">إكمال يدوي</button>
-            </form>
-            <form method="post" action="{{ url_for('admin_order_action', order_id=o.id, action='reject') }}" style="display:inline">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn danger" type="submit">رفض</button>
-            </form>
           </td>
         </tr>
       {% endfor %}

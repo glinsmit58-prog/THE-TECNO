@@ -105,5 +105,41 @@ document.addEventListener('change', (e)=>{ if(e.target && e.target.id==='payment
     }
   } catch (e) { /* المتصفحات القديمة: تجاهل */ }
 })();
+
+// V69.1: قفل فوري لزر "إرسال طلب الشحن" قبل تحميل app.js — يمنع
+// الإرسال المزدوج (المستخدم يضغط ثم يضغط ثانية بسبب بطء الشبكة،
+// فيُنشَأ طلبان متطابقان). نُطبّقه inline حتى يكون فعّالاً حتى لو
+// لم يكن app.js قد حُمّل بعد. يُعزّزه أيضاً منع الـ idempotency على
+// الخادم في create_deposit (نافذة 60 ثانية).
+(function(){
+  var form = document.getElementById('deposit');
+  if (!form) return;
+  var locked = false;
+  form.addEventListener('submit', function(e){
+    if (locked) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+    locked = true;
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) {
+      btn.disabled = true;
+      btn.setAttribute('aria-disabled', 'true');
+      if (!btn.dataset._origText) btn.dataset._origText = btn.innerText;
+      btn.innerText = 'جارٍ الإرسال...';
+    }
+    // أمان: لو فشل الإرسال (تحقق من المتصفح، خطأ شبكة)، أعد الفتح
+    // بعد ١٢ ثانية حتى لا يبقى الزر معطّلاً للأبد.
+    setTimeout(function(){
+      locked = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.removeAttribute('aria-disabled');
+        if (btn.dataset._origText) btn.innerText = btn.dataset._origText;
+      }
+    }, 12000);
+  });
+})();
 </script>
 {% endblock %}
