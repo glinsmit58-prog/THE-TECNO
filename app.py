@@ -2093,28 +2093,28 @@ def wallet():
         dep = create_deposit(user["id"], amount, method_id, proof, amount_usd=amount_usd,
                              proof_filename=proof_filename_saved)
         if dep:
-            # V67.3: رسالة تأكيد نظيفة — مبنية على كلاس CSS واحد بدلاً من
-            # inline-styles مبعثرة. تمرّر بنية HTML بسيطة، وكلاس
-            # `tg-deposit-toast` هو من يتولى التنسيق (ألوان، حشو، أيقونة،
-            # خط، تباعد). انظر static/css/v60-neon.css.
-            track_url = url_for("wallet_transactions")
-            flash(Markup(
-                '<div class="tg-deposit-toast" data-once="1">'
-                '<span class="tg-deposit-toast__icon" aria-hidden="true">✓</span>'
-                '<div class="tg-deposit-toast__body">'
-                f'<div class="tg-deposit-toast__title">تم استلام طلب الشحن رقم <strong>{dep[1]}</strong> بنجاح</div>'
-                '<div class="tg-deposit-toast__desc">'
-                'طلبك الآن قيد المراجعة من قبل الإدارة، وسيُضاف الرصيد إلى محفظتك فور الموافقة. '
-                f'<a href="{track_url}" class="tg-deposit-toast__link">متابعة حالة الطلب</a>'
-                '</div>'
-                '</div>'
-                '</div>'
-            ), "success")
+            # V69: لم نعد نستخدم flash() لرسالة "تم استلام طلب الشحن" لأن
+            # كثيرًا من المستخدمين كانوا يرونها تظهر مرة أخرى عند تحديث
+            # الصفحة (F5) بسبب مزيج من bfcache + StaleWhileRevalidate في
+            # service worker + إعادة استهلاك الـ session flash بعد رحلة
+            # ذهاب وإياب. الحل: نرفع الرسالة عبر query param في الـ URL
+            # (?deposit_ok=<code>) ثم نُزيله من شريط العنوان بـ
+            # history.replaceState فور عرض الـ toast، فلا يبقى أثر بعد
+            # أول refresh.
+            return redirect(url_for("wallet", deposit_ok=dep[1]))
         else:
             flash("فشل إرسال طلب الشحن", "danger")
         return redirect(url_for("wallet"))
 
-    return render_template("wallet.html", methods=list_payment_methods(only_active=True), support=get_setting("support_contact", "@support"), deposits=list_deposits_for_user(user["id"]), usd_syp_rate=get_usd_syp_rate())
+    deposit_ok = (request.args.get("deposit_ok") or "").strip()[:64] or None
+    return render_template(
+        "wallet.html",
+        methods=list_payment_methods(only_active=True),
+        support=get_setting("support_contact", "@support"),
+        deposits=list_deposits_for_user(user["id"]),
+        usd_syp_rate=get_usd_syp_rate(),
+        deposit_ok=deposit_ok,
+    )
 
 
 @app.route("/wallet/transactions")
