@@ -100,8 +100,10 @@ document.getElementById('checkout-form').addEventListener('submit', function(e) 
     btnReverify:  IS_EN ? '🔄 Re-check' : '🔄 أعد التحقق',
     networkErr:   IS_EN ? 'Network error, try again' : 'خطأ بالشبكة، حاول مجدداً',
     rateLimited:  IS_EN ? 'Too many attempts, wait a moment' : 'محاولات كثيرة، انتظر لحظة',
-    serverErr:    IS_EN ? 'Could not verify, try again later' : 'تعذّر التحقق، حاول لاحقاً',
-    verifiedOnly: IS_EN ? 'Player ID is valid (name not provided)' : 'معرف اللاعب صحيح (الاسم غير متوفر)',
+    // V71.1: رسالة موحّدة ومختصرة لكل حالات الفشل (سواء ID خطأ أو
+    // أي خطأ آخر من المورد). لا نعرض تفاصيل المورد الفنية للمستخدم.
+    invalidId:    IS_EN ? 'Player ID is incorrect' : 'معرف اللاعب غير صحيح',
+    verifiedOnly: IS_EN ? 'Player ID is valid' : 'معرف اللاعب صحيح',
     unsupported:  IS_EN ? 'Verification not supported for this package' : 'هذه الباقة لا تدعم التحقق من الاسم',
     success:      IS_EN ? 'Player' : 'اللاعب',
   };
@@ -158,7 +160,9 @@ document.getElementById('checkout-form').addEventListener('submit', function(e) 
     .then(function(res) {
       var j = res.body || {};
       if (!j.ok) {
-        setResult('err', j.error || T.serverErr);
+        // V71.1: رسالة موحّدة - لا نعرض تفاصيل المورد
+        setResult('err', '❌ ' + T.invalidId);
+        pidInput.classList.add('input-err');
         return;
       }
       if (j.enabled === false) {
@@ -169,8 +173,6 @@ document.getElementById('checkout-form').addEventListener('submit', function(e) 
       if (j.success) {
         if (j.player_name) {
           setResult('ok', '✅ ' + T.success + ': ' + j.player_name);
-        } else if (j.verified_only) {
-          setResult('ok', '✅ ' + T.verifiedOnly);
         } else {
           setResult('ok', '✅ ' + T.verifiedOnly);
         }
@@ -178,7 +180,8 @@ document.getElementById('checkout-form').addEventListener('submit', function(e) 
         // المورد لا يدعم - تنبيه فقط، الشراء مسموح
         setResult('warn', 'ℹ️ ' + T.unsupported);
       } else {
-        setResult('err', '❌ ' + (j.error || T.serverErr));
+        // V71.1: أي فشل آخر = رسالة موحّدة "ID غير صحيح"
+        setResult('err', '❌ ' + T.invalidId);
         pidInput.classList.add('input-err');
       }
     })
