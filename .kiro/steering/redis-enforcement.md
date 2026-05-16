@@ -85,13 +85,20 @@ if _redis_url:
         log.warning("Redis unreachable (dev mode — continuing): %s", exc)
 ```
 
-### الخطوة 3 — Procfile: worker منفصل
+### الخطوة 3 — Procfile: worker منفصل + ترقية -w قابلة للضبط
 
 ```procfile
-web: gunicorn -k gthread -w 1 --threads 4 --timeout 60 wsgi:app
+# V69: -w 2 افتراضياً، قابل للرفع إلى 3 عبر WEB_CONCURRENCY بدون إعادة deploy.
+# لا نستخدم --preload لأن redis-py + Flask-Limiter + RQ تُنشئ sockets عند
+# الـ import؛ والـ fork() يُفسد ترتيب الردود ("Reader/Writer mismatched response").
+web: gunicorn -k gthread -w ${WEB_CONCURRENCY:-2} --threads ${WEB_THREADS:-4} --timeout ${WEB_TIMEOUT:-60} --graceful-timeout ${WEB_GRACEFUL_TIMEOUT:-30} --max-requests ${WEB_MAX_REQUESTS:-1000} --max-requests-jitter ${WEB_MAX_REQUESTS_JITTER:-100} --access-logfile - --error-logfile - -b 0.0.0.0:${PORT:-5000} wsgi:app
 worker: python worker_rq.py
 ```
 
+> **لماذا -w 2 آمن الآن:** `wsgi.py` يُنفِّذ `init_db / ensure_indexes / seed_admin / seed_local_provider_catalog` إيجارًا، وكلها idempotent (`INSERT OR IGNORE` + `IF NOT EXISTS`). SQLite في وضع WAL يدعم قُرّاء متعددين عبر processes متعددة. كل worker سيعيد التهيئة بأمان مرة واحدة عند الإقلاع (تكلفة بسيطة في الـ cold start).
+>
+> **لماذا ليس --preload:** `app.py` و `tasks.py` يُنشئان عميل Redis عند الـ import (Flask-Limiter storage_uri، تهيئة RQ في `tasks.py`). مع `--preload` تُنسخ الـ socket FDs إلى كل أبناء العملية وتنكسر بقاء الاستجابات تحت الحمل. التكلفة الحقيقية لإعادة الـ import في كل worker = أجزاء من الثانية مرة واحدة عند الإقلاع، وهي أرخص من إعادة هيكلة كل عملاء Redis في `post_fork()` hook.
+>
 > **مهم:** على منصّات heroku-like يحتاج المستخدم تفعيل الـworker dyno يدوياً. على Railway/Render يُضاف كخدمة منفصلة. **وثّق هذا في `README.md`.**
 
 ### الخطوة 4 — `.env.example` — REDIS_URL غير مُعلَّق
